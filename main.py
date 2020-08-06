@@ -20,6 +20,7 @@ weightingFunctions = {
 	"pumping":True
 }
 beginningWeightPar = 
+maxGaps = 
 
 ### prepare time series
 
@@ -30,7 +31,7 @@ ratesRaw = get_rates(starttime = starttime, endtime = endtime)
 
 ## clean and merge data
 
-timeseries, waterlevel, rates, isInterWl, isInterRates = merge_sets(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw)
+timeseries, waterlevel, rates, isInterWl, isInterRates = merge_sets(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
 
 ### set up nodes
 
