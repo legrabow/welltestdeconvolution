@@ -1,5 +1,3 @@
-import numpy as np
-
 def get_nodes(amountNodes, interpolation, startNode, timeLength):
 	### calculate and return the nodes corresponding to the logarithmic time steps of the response function
 	n0 = np.ln(startNode)
@@ -11,7 +9,7 @@ def get_nodes(amountNodes, interpolation, startNode, timeLength):
 			n = n0 + k * (nEnd - n0) / (amountNodes - 1)
 			nodes.append(n)
 	nodes.append(nEnd)
-	return(nodes)
+	return nodes
 
 def get_initial_wlNat(waterlevel):
 	### return the maximum waterlevel value as the natural waterlevel
@@ -20,7 +18,7 @@ def get_initial_wlNat(waterlevel):
 	"\nNote that this makes only sense if recovery periods exist in the time range!"
 	warnings.warn(message)
 	wlNat = max(waterlevel)
-	return(wlNat)
+	return wlNat
 
 def get_initial_responses(nodes, waterlevel, rates, pNat):
 	### calculate and return an inital response function as a start value for the
@@ -37,4 +35,4 @@ def get_initial_responses(nodes, waterlevel, rates, pNat):
 	## create response array
 	responsesRadial = np.full(np.ln(radialFlow), len(nodes) - 1)
 	responsesTotal = np.insert(responsesRadial, 0, ln(wbsCoef))
-	return(responsesTotal)
+	return responsesTotal

@@ -2,25 +2,40 @@
 
 from datetime import datetime
 import warnings
+import pandas as pd
+import numpy as np
+from scipy.linalg import svd
 
 ## important parameters
+
+# start time of time series to look at
 starttime = datetime.Date("01/01/2001","%d/%m/%Y")
+# end time of time series to look at
 endtime = datetime.Date("01/01/2008","%d/%m/%Y")
+# amount of time nodes of the response function
+# increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
 amountNodes = 
 
 ## refining parameters
+
+# directory where to find the rate- and water level data
 dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
+# the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
 stoppingCriterion = 
-resolution = 
-startNode = 
+# time of the first node in percentage of one day (so 1 > startNode > 0)
+startNode = 0.3
+# optional weights to consider
 weightingFunctions = {
-	"tidals":True,
-	"holidays":True,
-	"beginning":True,
-	"pumping":True
+	"tidals":False,
+	"holidays":False,
+	"beginning":False,
+	"pumping":False
 }
-beginningWeightPar = 
-maxGaps = 
+# specifing the sharpness of the arctan function as a weight function for the beginning
+beginningWeightPar = None
+# maximal gaps that are acceptable without giving out a warning about bad deconvolution results
+maxGaps = 10
+# provide your own assumed natural water level. Very important if the time series does not exhibit recovery periods!
 wlNatIn = None
 
 ### prepare time series
@@ -49,13 +64,23 @@ zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn,
 
 ### get weighting functions
 
-get_tidal_weighting(timeseries)
-get_holiday_weighting(timeseries)
-get_beginningWeight(beginningWeightPar)
-get_pumping_weigthing(yIn)
+weights = dict()
 
-get_rateError_weight()
-get_derivate_weight()
+## own weights
+
+if weightingFunctions["tidals"]:
+	weights["tidals"] = get_tidal_weighting(timeseries)
+if weightingFunctions["holidays"]:
+	weights["holidays"] = get_holiday_weighting(timeseries)
+if weightingFunctions["beginning"]:
+	weights["beginning"] = get_beginningWeight(beginningWeightPar)
+if weightingFunctions["pumping"]:
+	weights["pumping"] = get_pumping_weigthing(yIn)
+
+## general weights
+
+weights["rew"] = get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
+weights["dw"] = get_derivate_weight()
 
 ### solve the non-linear LTS-Problem
 

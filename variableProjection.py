@@ -1,19 +1,18 @@
-import numpy as np
-
 def variable_projection(nodes, waterlevel, rates, pNat, z, sc, weights):
 	# solve linear part
+	U, s, VT = svd(A)
 	# solve non-linear part
 	if(lower stoping criterion):
 		variable_projection()
 	else:
-		return()
+		return 
 
 def generate_vVector(rew, dw, z, waterlevel, rates):
 	### calculate the vector that contains the waterlevel, the wheighted rates
 	### and the smoothness measure for the total error function
 	smoothness = generate_smoothnessMeasure()
 	vVec = [waterlevel, rates * np.sqrt(rew), smoothness]
-	return(vVec)
+	return vVec
 
 def generate_smoothnessMeasure(dw):
 	### calulculate the smoothness measure to minimize
@@ -21,18 +20,19 @@ def generate_smoothnessMeasure(dw):
 	expected = np.zeros(len(nodes))
 	expected[0] = 1
 	smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
-	return(smoothness)
+	return smoothness
 
 def generate_jacobian(nodes, z, y, dw):
 	### calculate the jacobian matrix of the error measure with respect to the 
 	### response values for Gauss-Newton
 	jacobianConvolution = generate_jacobianConvolution(nodes, z, y)
 	sdMat = generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
-	jacobianRates = np.zeros(shape=(len(y), len(y)))
+	jacobianRates = np.zeros(shape=(len(y), len(z)))
 	jacobianTotal = np.concatenate((jacobianConvolution, sdMat, jacobianRates))
-	return(jacobianTotal)
+	return jacobianTotal
 
-def generate_jacobianConvolution(nodes, z, y)
+def generate_jacobianConvolution(nodes, z, y):
+	### calculate the jacobian matrix of the convolution matrix with respect to the response values
 	jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
 	for k in xrange(len(nodes)):
 		v1 = np.zeros(int(np.exp(nodes[-1])))
@@ -79,8 +79,10 @@ def generate_jacobianConvolution(nodes, z, y)
 		for i in xrange(rateLength):
     			kthDerivativeMat[i:, i] = v1[:- i]
 		jacobianConvolution[:,k] = - kthDerivativeMat.dot(y)
+	return jacobianConvolution
 
 def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, goingDown):
+	### integrate the derivative with respect to the response values over time
 	dCurrent = evaluate_integral_derivative(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent)
 	cCurrent = evaluate_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent)
 	if goingDown:
@@ -90,7 +92,7 @@ def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefor
 		factor = 1
 		xIntersect = nodeBefore
 	result = factor * (dCurrent - xIntersect * cCurrent) / (nodeCurrent - nodeBefore)
-	return(result)
+	return result
 
 	
 def generate_secondDerivativeMatrix(nodes):
@@ -108,7 +110,7 @@ def generate_secondDerivativeMatrix(nodes):
 			sdMat[idx, idx - 1] = 1 / angleSideAfter
 			sdMat[idx, idx] = (angleSideAfter + angleSideBefore) / (angleSideAfter * angleSideBefore)
 			sdMat[idx, idx + 1] = 1 / angleSideBefore
-	return(sdMat)
+	return sdMat
 
 def generate_fMatrix(rew, z, rateLength, wlLength):
 	### calculate the matrix that will be multiplied with the presumed rates for the total error function
@@ -116,7 +118,7 @@ def generate_fMatrix(rew, z, rateLength, wlLength):
 	pNatIdentity = np.identity(wlLength)
 	rateIdentity = np.identity(rateLength) * np.sqrt(rew)
 	fMat = [[pNatIdentity, -convMat], [0, rateIdentity], [0, 0]]
-	return(fMat)
+	return fMat
 	
 
 def generate_convMatrix(z, rateLength):
@@ -125,7 +127,7 @@ def generate_convMatrix(z, rateLength):
 	convMat = np.zeros(shape=(len(v1),rateLength))
 	for i in xrange(rateLength):
     		convMat[i:, i] = v1[:- i]
-	return(convMat)
+	return convMat
 
 def calculate_entries(start, end, z, nodes):
 	### calculate each entry of the convolution matrix which corresponds to each pumping period in time (only works for constant rate intervals!)
@@ -141,10 +143,10 @@ def calculate_entries(start, end, z, nodes):
 		idxBefore = idx - 1
 		subSum = evaluate_integral(nodeCurrent = nodes[idx], nodeBefore = nodes[idxBefore], start, end, zBefore = [idxBefore], zCurrent = z[idx])
 		entry += subSum
-	return(entry)
+	return entry
 	
 def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
-	### integrate the node-dependent part of the derivative with respect to the response values over time
+	### integrate linearly amplified node-dependent part of the derivative with respect to the response values over time
 	upperLim = np.minimum(np.log(end), nodeCurrent)
 	if start == 0:
 		lowerLim = nodeBefore
@@ -162,7 +164,7 @@ def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, z
 		else:
 			result = (upperLim ** 2 - lowerLim ** 2) / 2
 	result = result * np.exp(intersect)	
-	return(result)
+	return result
 
 def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
 	### calculate the actual convolution of each entry by integrating the response function over time
@@ -183,7 +185,7 @@ def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
 		else:
 			result = upperLim - lowerLim
 	result = result * np.exp(intersect)
-	return(result)
+	return result
 
 
 

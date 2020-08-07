@@ -1,5 +1,3 @@
-import pandas as pd
-
 def get_waterlevel(starttime, endtime):
 	### read in water level data
 	### return a pandas data frame
@@ -8,7 +6,7 @@ def get_waterlevel(starttime, endtime):
 	dataFrame["Time"] = pd.to_datetime(dataFrame["Time"], format="%d.%m.%Y")
 	toTake = (dataFrame["Time"] >= starttime) & (dataFrame["Time"] <= endtime)
 	dataFrame = dataFrame[toTake]
-	return(dataFrame)
+	return dataFrame
 
 
 def get_rates(starttime, endtime):
@@ -19,7 +17,7 @@ def get_rates(starttime, endtime):
 	dataFrame["Datum"] = pd.to_datetime(dataFrame["Datum"], format="%d/%m/%Y")
 	toTake = (dataFrame["Datum"] >= starttime) & (dataFrame["Datum"] <= endtime)
 	dataFrame = dataFrame[toTake]
-	return(dataFrame)
+	return dataFrame
 
 def process_data(waterlevelFrame, ratesFrame, maxGaps):
 	### do some data checking and cleaning
@@ -46,7 +44,7 @@ def process_data(waterlevelFrame, ratesFrame, maxGaps):
 	timeseries = list(waterlevel["Time"])
 	waterlevel = np.array(waterlevelFrame["Waterlevel"])
 	rates = np.array(ratesFrame["Gesamt"])
-	return(timeseries, waterlevel, rates, isInterWl, isInterRates)
+	return timeseries, waterlevel, rates, isInterWl, isInterRates
 
 def cut_time_range(waterlevelFrame, ratesFrame):
 	### in case Na's occour at the start or end of waterlevelFrame or ratesFrame, remove these and cut both
@@ -66,14 +64,13 @@ def cut_time_range(waterlevelFrame, ratesFrame):
 		commonEnd = np.minimum(waterLevel["Time"][notNaWL], ratesFrame["Datum"][notNaRates])
 		ratesFrameReturn = ratesFrameReturn[ratesFrameReturn["Datum"] <= commonEnd]
 		waterlevelFrameReturn = waterlevelFrameReturn[waterlevelFrameReturn["Time"] <= commonEnd]
-	return(waterlevelFrameReturn, ratesFrameReturn)
+	return waterlevelFrameReturn, ratesFrameReturn
 
 def check_time_gaps(timeseries):
 	### check if there exist any gaps in the time series and issue a warning if so
 	### void function
 	if any(timeseries.diff().dt.days > 1):
 		warnings.warn("\nTime gap found. This should not exist in the original data set!")
-	return()
 
 def check_gap_length(timeseries, maxGaps, isna):
 	### check if there exist Na-gaps longer than maxGaps (provided by the user) in both data sets
@@ -94,5 +91,4 @@ def check_gap_length(timeseries, maxGaps, isna):
 				warnings.warn(message)
 				counter = 1
 				priorIdx = idx
-	return()
 
