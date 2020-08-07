@@ -23,21 +23,29 @@ def generate_smoothnessMeasure(dw):
 	smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
 	return(smoothness)
 
-def generate_jacobian(nodes, z):
+def generate_jacobian(nodes, z, y, dw):
 	### calculate the jacobian matrix of the error measure with respect to the 
 	### response values for Gauss-Newton
-	for k in xrange(nodes):
+	jacobianConvolution = generate_jacobianConvolution(nodes, z, y)
+	sdMat = generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
+	jacobianRates = np.zeros(shape=(len(y), len(y)))
+	jacobianTotal = np.concatenate((jacobianConvolution, sdMat, jacobianRates))
+	return(jacobianTotal)
+
+def generate_jacobianConvolution(nodes, z, y)
+	jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
+	for k in xrange(len(nodes)):
 		v1 = np.zeros(int(np.exp(nodes[-1])))
 		if k == 0:
 			startTriangle = 0
 			endTriangle = np.ceil(np.exp(nodes[k + 1]))
 			derivativeEntry = evaluate_integral(nodes[0], nodes[-1], startTriangle, endTriangle, z[-1], z[0])
 			v1[0] = derivativeEntry
+			nodeCurrent = nodes[k + 1]
+			nodeBefore = nodes[k]
+			zCurrent = z[k + 1]
+			zBefore = z[k]
 			for timeIdx in xrange(startTriangle, endTriangle):
-				nodeCurrent = nodes[k + 1]
-				nodeBefore = nodes[k]
-				zCurrent = z[k + 1]
-				zBefore = z[k]
 				subStart = timeIdx
 				subEnd = timeIdx + 1
 				derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, True)
@@ -45,11 +53,11 @@ def generate_jacobian(nodes, z):
 		else:
 			startTriangle = np.floor(np.exp(nodes[k - 1]))
 			endTriangle = np.ceil(np.exp(nodes[k]))
+			nodeCurrent = nodes[k]
+			nodeBefore = nodes[k - 1]
+			zCurrent = z[k]
+			zBefore = z[k - 1]
 			for timeIdx in xrange(startTriangle, endTriangle):
-				nodeCurrent = nodes[k]
-				nodeBefore = nodes[k - 1]
-				zCurrent = z[k]
-				zBefore = z[k - 1]
 				subStart = timeIdx
 				subEnd = timeIdx + 1
 				derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, False)
@@ -57,19 +65,20 @@ def generate_jacobian(nodes, z):
 			if k != (len(k) - 1):
 				startTriangle = np.floor(np.exp(nodes[k]))
 				endTriangle = np.ceil(np.exp(nodes[k + 1]))
+				nodeCurrent = nodes[k + 1]
+				nodeBefore = nodes[k]
+				zCurrent = z[k + 1]
+				zBefore = z[k]
 				for timeIdx in xrange(startTriangle, endTriangle):
-					nodeCurrent = nodes[k + 1]
-					nodeBefore = nodes[k]
-					zCurrent = z[k + 1]
-					zBefore = z[k]
 					subStart = timeIdx
 					subEnd = timeIdx + 1
 					derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, True)
 					v1[timeIdx] += derivateEntry
 		
-	convMat = np.zeros(shape=(len(v1),rateLength))
-	for i in xrange(rateLength):
-    		convMat[i:, i] = v1[:- i]	
+		kthDerivativeMat = np.zeros(shape=(len(v1),rateLength))
+		for i in xrange(rateLength):
+    			kthDerivativeMat[i:, i] = v1[:- i]
+		jacobianConvolution[:,k] = - kthDerivativeMat.dot(y)
 
 def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, goingDown):
 	dCurrent = evaluate_integral_derivative(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent)
