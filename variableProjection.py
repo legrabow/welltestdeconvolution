@@ -23,11 +23,66 @@ def generate_smoothnessMeasure(dw):
 	smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
 	return(smoothness)
 
-def generate_jacobian():
+def generate_jacobian(nodes, z):
 	### calculate the jacobian matrix of the error measure with respect to the 
 	### response values for Gauss-Newton
 	for k in xrange(nodes):
-		for i in 
+		v1 = np.zeros(int(np.exp(nodes[-1])))
+		if k == 0:
+			startTriangle = 0
+			endTriangle = np.ceil(np.exp(nodes[k + 1]))
+			derivativeEntry = evaluate_integral(nodes[0], nodes[-1], startTriangle, endTriangle, z[-1], z[0])
+			v1[0] = derivativeEntry
+			for timeIdx in xrange(startTriangle, endTriangle):
+				nodeCurrent = nodes[k + 1]
+				nodeBefore = nodes[k]
+				zCurrent = z[k + 1]
+				zBefore = z[k]
+				subStart = timeIdx
+				subEnd = timeIdx + 1
+				derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, True)
+				v1[timeIdx] += derivateEntry
+		else:
+			startTriangle = np.floor(np.exp(nodes[k - 1]))
+			endTriangle = np.ceil(np.exp(nodes[k]))
+			for timeIdx in xrange(startTriangle, endTriangle):
+				nodeCurrent = nodes[k]
+				nodeBefore = nodes[k - 1]
+				zCurrent = z[k]
+				zBefore = z[k - 1]
+				subStart = timeIdx
+				subEnd = timeIdx + 1
+				derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, False)
+				v1[timeIdx] = derivateEntry
+			if k != (len(k) - 1):
+				startTriangle = np.floor(np.exp(nodes[k]))
+				endTriangle = np.ceil(np.exp(nodes[k + 1]))
+				for timeIdx in xrange(startTriangle, endTriangle):
+					nodeCurrent = nodes[k + 1]
+					nodeBefore = nodes[k]
+					zCurrent = z[k + 1]
+					zBefore = z[k]
+					subStart = timeIdx
+					subEnd = timeIdx + 1
+					derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, True)
+					v1[timeIdx] += derivateEntry
+		
+	convMat = np.zeros(shape=(len(v1),rateLength))
+	for i in xrange(rateLength):
+    		convMat[i:, i] = v1[:- i]	
+
+def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, goingDown):
+	dCurrent = evaluate_integral_derivative(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent)
+	cCurrent = evaluate_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent)
+	if goingDown:
+		factor = - 1
+		xIntersect = nodeCurrent
+	else:
+		factor = 1
+		xIntersect = nodeBefore
+	result = factor * (dCurrent - xIntersect * cCurrent) / (nodeCurrent - nodeBefore)
+	return(result)
+
 	
 def generate_secondDerivativeMatrix(nodes):
 	### calculate the matrix measuring the sinus of the angle between each interpolating
@@ -97,6 +152,7 @@ def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, z
 			result = ((upperLim - 1 / slope) * np.exp(slope * upperLim) - (lowerLim - 1 / slope) * np.exp(slope * lowerLim)) / slope
 		else:
 			result = (upperLim ** 2 - lowerLim ** 2) / 2
+	result = result * np.exp(intersect)	
 	return(result)
 
 def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
