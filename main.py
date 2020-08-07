@@ -21,6 +21,7 @@ weightingFunctions = {
 }
 beginningWeightPar = 
 maxGaps = 
+wlNatIn = None
 
 ### prepare time series
 
@@ -31,7 +32,7 @@ ratesRaw = get_rates(starttime = starttime, endtime = endtime)
 
 ## clean and merge data
 
-timeseries, waterlevel, rates, isInterWl, isInterRates = merge_sets(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
+timeseries, waterlevel, rates, isInterWl, isInterRates = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
 
 ### set up nodes
 
@@ -40,7 +41,8 @@ nodes = get_nodes(amountNodes = amountNodes, interpolation="linear", startNode =
 
 ### calculate initial values
 
-wlNatIn = get_initial_wlNat(waterlevel = waterlevel)
+if not wlNatIn:
+	wlNatIn = get_initial_wlNat(waterlevel = waterlevel)
 yIn = rates
 zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn, pNat = pNat)
 

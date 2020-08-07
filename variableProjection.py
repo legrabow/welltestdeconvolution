@@ -9,11 +9,14 @@ def variable_projection(nodes, waterlevel, rates, pNat, z, sc, weights):
 		return()
 
 def generate_vVector(rew, dw, z, waterlevel, rates):
+	### calculate the vector that contains the waterlevel, the wheighted rates
+	### and the smoothness measure for the total error function
 	smoothness = generate_smoothnessMeasure()
 	vVec = [waterlevel, rates * np.sqrt(rew), smoothness]
 	return(vVec)
 
 def generate_smoothnessMeasure(dw):
+	### calulculate the smoothness measure to minimize
 	sdMat = generate_secondDerivativeMatrix(nodes)
 	expected = np.zeros(len(nodes))
 	expected[0] = 1
@@ -21,10 +24,14 @@ def generate_smoothnessMeasure(dw):
 	return(smoothness)
 
 def generate_jacobian():
+	### calculate the jacobian matrix of the error measure with respect to the 
+	### response values for Gauss-Newton
 	for k in xrange(nodes):
 		for i in 
 	
 def generate_secondDerivativeMatrix(nodes):
+	### calculate the matrix measuring the sinus of the angle between each interpolating
+	### function of the response estimate
 	dimRow = len(nodes)
 	sdMat = np.zeros(shape = (dimRow, dimRow)
 	for idx in xrange(dimRow):
@@ -40,6 +47,7 @@ def generate_secondDerivativeMatrix(nodes):
 	return(sdMat)
 
 def generate_fMatrix(rew, z, rateLength, wlLength):
+	### calculate the matrix that will be multiplied with the presumed rates for the total error function
 	convMat = generate_convMatrix(z, rateLength)
 	pNatIdentity = np.identity(wlLength)
 	rateIdentity = np.identity(rateLength) * np.sqrt(rew)
@@ -48,6 +56,7 @@ def generate_fMatrix(rew, z, rateLength, wlLength):
 	
 
 def generate_convMatrix(z, rateLength):
+	### calculate the actual convolution matrix (assuming constant rate intervals!)
 	v1 = [calculate_entries(start = t - 1, end = t, z) for t in 1:int(np.exp(nodes[-1]))]
 	convMat = np.zeros(shape=(len(v1),rateLength))
 	for i in xrange(rateLength):
@@ -55,6 +64,7 @@ def generate_convMatrix(z, rateLength):
 	return(convMat)
 
 def calculate_entries(start, end, z, nodes):
+	### calculate each entry of the convolution matrix which corresponds to each pumping period in time (only works for constant rate intervals!)
 	if start == 0:
 		idxs = np.where(nodes <= np.ln(end))[0]
 	else:
@@ -70,6 +80,7 @@ def calculate_entries(start, end, z, nodes):
 	return(entry)
 	
 def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
+	### integrate the node-dependent part of the derivative with respect to the response values over time
 	upperLim = np.minimum(np.log(end), nodeCurrent)
 	if start == 0:
 		lowerLim = nodeBefore
@@ -89,6 +100,7 @@ def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, z
 	return(result)
 
 def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
+	### calculate the actual convolution of each entry by integrating the response function over time
 	upperLim = np.minimum(np.log(end), nodeCurrent)
 	if start == 0:
 		lowerLim = nodeBefore
