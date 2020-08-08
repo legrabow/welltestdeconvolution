@@ -58,7 +58,7 @@ nodes = get_nodes(amountNodes = amountNodes, interpolation="linear", startNode =
 ### calculate initial values
 
 if not wlNatIn:
-	wlNatIn = get_initial_wlNat(waterlevel = waterlevel)
+    wlNatIn = get_initial_wlNat(waterlevel = waterlevel)
 yIn = rates
 zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn, pNat = pNat)
 xIn = np.insert(yIn, 0, wlNatIn)
@@ -70,13 +70,13 @@ weights = dict()
 ## own weights
 
 if weightingFunctions["tidals"]:
-	weights["tidals"] = get_tidal_weighting(timeseries)
+    weights["tidals"] = get_tidal_weighting(timeseries)
 if weightingFunctions["holidays"]:
-	weights["holidays"] = get_holiday_weighting(timeseries)
+    weights["holidays"] = get_holiday_weighting(timeseries)
 if weightingFunctions["beginning"]:
-	weights["beginning"] = get_beginningWeight(beginningWeightPar)
+    weights["beginning"] = get_beginningWeight(beginningWeightPar)
 if weightingFunctions["pumping"]:
-	weights["pumping"] = get_pumping_weigthing(yIn)
+    weights["pumping"] = get_pumping_weigthing(yIn)
 
 ## general weights
 
