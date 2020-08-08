@@ -4,7 +4,7 @@ from datetime import datetime
 import warnings
 import pandas as pd
 import numpy as np
-from scipy.linalg import svd
+from scipy.linalg import svd, pinv
 
 ## important parameters
 
@@ -60,7 +60,7 @@ if not wlNatIn:
 	wlNatIn = get_initial_wlNat(waterlevel = waterlevel)
 yIn = rates
 zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn, pNat = pNat)
-
+xIn = np.insert(yIn, 0, wlNatIn)
 
 ### get weighting functions
 
@@ -84,7 +84,7 @@ weights["dw"] = get_derivate_weight()
 
 ### solve the non-linear LTS-Problem
 
-y, z, pNat = variable_projection(nodes = nodes, waterlevel = waterlevel, rates = qIn, pNat = pNatIn, z = zIn, sc = stoppingCriterion, weights = weights)
+y, z, pNat = variable_projection(nodes, waterlevel, xIn, rates, pNatIn, zIn, stoppingCriterion, weights, stepsize)
 
 ### show result
 

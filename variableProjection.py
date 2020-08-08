@@ -1,11 +1,35 @@
-def variable_projection(nodes, waterlevel, rates, pNat, z, sc, weights):
-	# solve linear part
-	U, s, VT = svd(A)
-	# solve non-linear part
-	if(lower stoping criterion):
-		variable_projection()
+def variable_projection(nodes, waterlevel, x, rates, pNat, z, sc, weights, stepsize, errorIn = None):
+	### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
+	### recursive function
+
+	fMat = generate_fMatrix(rew, z, rateLength, wlLength)
+	vVec = generate_vVector(rew, dw, z, waterlevel, rates)
+
+	## calculate error
+	error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
+	if errorIn:
+		errorRatio = error / errorIn
+		if(errorRatio <= sc):
+			return x[:(rateLength + 1)], z, x[0]
 	else:
-		return 
+		errorIn = error
+
+	## solve linear part
+	constant = vVec - fMat.dot(x)
+	dx = pinv(fMat).dot(constant)
+	x = x + dx
+
+	## solve non-linear part
+	currentPosition = fMat.dot(x) - vVec
+	zJacobian = generate_jacobian(nodes, z, y, dw)
+	totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
+	dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
+	x = x + dTotal[:(rateLength + 1)]
+	z = z + dTotal[(rateLength + 1):]
+
+	## call again
+	variable_projection(nodes, waterlevel, x, rates, pNat, z, sc, weights, stoppingCriterion, stepsize, errorIn)
+ 
 
 def generate_vVector(rew, dw, z, waterlevel, rates):
 	### calculate the vector that contains the waterlevel, the wheighted rates
@@ -28,8 +52,8 @@ def generate_jacobian(nodes, z, y, dw):
 	jacobianConvolution = generate_jacobianConvolution(nodes, z, y)
 	sdMat = generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
 	jacobianRates = np.zeros(shape=(len(y), len(z)))
-	jacobianTotal = np.concatenate((jacobianConvolution, sdMat, jacobianRates))
-	return jacobianTotal
+	zJacobian = np.concatenate((jacobianConvolution, sdMat, jacobianRates))
+	return zJacobian
 
 def generate_jacobianConvolution(nodes, z, y):
 	### calculate the jacobian matrix of the convolution matrix with respect to the response values
