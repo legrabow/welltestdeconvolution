@@ -9,27 +9,28 @@ from scipy.linalg import svd, pinv
 ## important parameters
 
 # start time of time series to look at
-starttime = datetime.Date("01/01/2001","%d/%m/%Y")
+starttime = datetime.strptime("01/01/2001","%d/%m/%Y")
 # end time of time series to look at
-endtime = datetime.Date("01/01/2008","%d/%m/%Y")
+endtime = datetime.strptime("01/01/2008","%d/%m/%Y")
 # amount of time nodes of the response function
 # increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
-amountNodes = 
+# if no amount is given by the user the amount will be equal to the amount of rates
+amountNodes = None
 
 ## refining parameters
 
 # directory where to find the rate- and water level data
 dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
 # the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
-stoppingCriterion = 
+stoppingCriterion = 10**-8
 # time of the first node in percentage of one day (so 1 > startNode > 0)
 startNode = 0.3
 # optional weights to consider
 weightingFunctions = {
-	"tidals":False,
-	"holidays":False,
-	"beginning":False,
-	"pumping":False
+ "tidals":False,
+ "holidays":False,
+ "beginning":False,
+ "pumping":False
 }
 # specifing the sharpness of the arctan function as a weight function for the beginning
 beginningWeightPar = None

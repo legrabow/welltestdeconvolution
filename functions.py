@@ -1,5 +1,7 @@
 def get_nodes(amountNodes, interpolation, startNode, timeLength):
 	### calculate and return the nodes corresponding to the logarithmic time steps of the response function
+	if not amountNodes:
+		amountNodes = timeLength
 	n0 = np.ln(startNode)
 	nEnd = np.ln(timeLength)
 	nodes = [n0]
