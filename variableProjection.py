@@ -40,7 +40,7 @@ def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
 def generate_smoothnessMeasure(dw, nodes, z):
     ### calulculate the smoothness measure to minimize
     sdMat = generate_secondDerivativeMatrix(nodes)
-    expected = np.zeros(len(nodes))
+    expected = np.zeros(len(nodes) - 1)
     expected[0] = 1
     smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
     return smoothness
@@ -121,18 +121,19 @@ def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefor
 def generate_secondDerivativeMatrix(nodes):
     ### calculate the matrix measuring the sinus of the angle between each interpolating
     ### function of the response estimate
-    dimRow = len(nodes)
-    sdMat = np.zeros(shape = (dimRow, dimRow))
-    for idx in xrange(dimRow):
+    dimCol = len(nodes)
+    sdMat = np.zeros(shape = ((dimCol - 1), dimCol))
+    for idx in xrange((dimCol - 1)):
         angleSideAfter = nodes[idx + 1] - nodes[idx]
         if idx == 0:
             sdMat[0, 0] = - 1 / angleSideAfter
             sdMat[0, 1] = 1 / angleSideAfter
         else:
+            # sign inverted? Typo in schroeter et al 2004?
             angleSideBefore =  nodes[idx] - nodes[idx - 1]
-            sdMat[idx, idx - 1] = 1 / angleSideAfter
+            sdMat[idx, idx + 1] = 1 / angleSideAfter
             sdMat[idx, idx] = (angleSideAfter + angleSideBefore) / (angleSideAfter * angleSideBefore)
-            sdMat[idx, idx + 1] = 1 / angleSideBefore
+            sdMat[idx, idx - 1] = 1 / angleSideBefore
     return sdMat
 
 def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
