@@ -21,8 +21,8 @@ def get_rates(starttime, endtime):
 
 def process_data(waterlevelFrame, ratesFrame, maxGaps):
     ### do some data checking and cleaning
-    ### return the water level and rates series as numpy objects, the time series and 
-    ### a boolean vector telling if entries have been interpolated
+    ### return the water level and rates series as numpy objects, the RELATIVE time series in  
+    ### unit of days and a boolean vector telling if entries have been interpolated
     ## check if gaps exist in the time series of both frames (should not)
     check_time_gaps(waterlevelFrame["Time"])
     check_time_gaps(ratesFrame["Datum"])
@@ -38,10 +38,11 @@ def process_data(waterlevelFrame, ratesFrame, maxGaps):
     waterlevelFrame = waterlevelFrame.interpolate()
     ratesFrame = ratesFrame.interpolate()
     ## check if everything went fine
-    if any(ratesFrame["Datum"] != waterlevelFrame["Time"]):
+    if any(np.array(ratesFrame["Datum"]) != np.array(waterlevelFrame["Time"])):
         raise Exception("Something went wrong during the data treatment!")
     ## convert data to expected data types
-    timeseries = list(waterlevel["Time"])
+    timeseries = waterlevelFrame["Time"] - waterlevelFrame["Time"].iloc[0]
+    timeseries = np.array(timeseries) / pd.Timedelta(1, unit='d')
     waterlevel = np.array(waterlevelFrame["Waterlevel"])
     rates = np.array(ratesFrame["Gesamt"])
     return timeseries, waterlevel, rates, isInterWl, isInterRates
@@ -49,28 +50,34 @@ def process_data(waterlevelFrame, ratesFrame, maxGaps):
 def cut_time_range(waterlevelFrame, ratesFrame):
     ### cut both frames to the same start- and end time and therby neglect Na's at head and tail 
     ### return the cutted pandas frames
-    print("Cut the rate- and the water level set to the same end- and start time if necessary")
-    ## check which values are not Na's
-    notNaWL = [not b for b in waterlevelFrame["Waterlevel"].isna()]
-    notNaRates = [not b for b in ratesFrame["Gesamt"].isna()]
-    ## tell the user what to expect
-    if not notNaWL[0] & notNaRates[0]:
-        print("\nFound Na values at the beginning")
-    if not notNaWL[-1] & notNaRates[-1]:
-        print("\nFound Na values at the end")
+    print("Cut the rate- and the water level series to the same end- and start time if necessary")
+    ## check if both have the same start time. If not, cut them
     if waterlevelFrame["Time"].iloc[0] != ratesFrame["Datum"].iloc[0]:
         print("\nThe start time of the rate- and the water level sets are not the same")
+        commonStart = np.maximum(waterlevelFrame["Time"].iloc[0], ratesFrame["Datum"].iloc[0])
+        ratesFrame = ratesFrame[ratesFrame["Datum"] >= commonStart]
+        waterlevelFrame = waterlevelFrame[waterlevelFrame["Time"] >= commonStart]
+    ## check if both have the same end time. If not, cut them
     if waterlevelFrame["Time"].iloc[-1] != ratesFrame["Datum"].iloc[-1]:
         print("\nThe end time of the rate- and the water level sets are not the same")
-    ## find out common start and end
-    commonStart = np.maximum(waterlevelFrame["Time"][notNaWL].iloc[0], ratesFrame["Datum"][notNaRates].iloc[0])
-    commonEnd = np.minimum(waterlevelFrame["Time"][notNaWL].iloc[-1], ratesFrame["Datum"][notNaRates].iloc[-1])
-    ## cut to common start
-    ratesFrame = ratesFrame[ratesFrame["Datum"] >= commonStart]
-    waterlevelFrame = waterlevelFrame[waterlevelFrame["Time"] >= commonStart]
-    ## cut to common end
-    ratesFrame = ratesFrame[ratesFrame["Datum"] <= commonEnd]
-    waterlevelFrame = waterlevelFrame[waterlevelFrame["Time"] <= commonEnd]
+        commonEnd = np.minimum(waterlevelFrame["Time"].iloc[-1], ratesFrame["Datum"].iloc[-1])
+        ratesFrame = ratesFrame[ratesFrame["Datum"] <= commonEnd]
+        waterlevelFrame = waterlevelFrame[waterlevelFrame["Time"] <= commonEnd]
+    ## get boolean which values are not Na's
+    notNaWL = [not b for b in waterlevelFrame["Waterlevel"].isna()]
+    notNaRates = [not b for b in ratesFrame["Gesamt"].isna()]
+    ## check if both start without Na's. If not, cut them to the first non-Na start
+    if not notNaWL[0] & notNaRates[0]:
+        print("\nFound Na values at the beginning")
+        commonStart = np.maximum(waterlevelFrame["Time"][notNaWL].iloc[0], ratesFrame["Datum"][notNaRates].iloc[0])
+        ratesFrame = ratesFrame[ratesFrame["Datum"] >= commonStart]
+        waterlevelFrame = waterlevelFrame[waterlevelFrame["Time"] >= commonStart]
+    ## check if both end without Na's. If not, cut them to the latest non-Na end
+    if not notNaWL[-1] & notNaRates[-1]:
+        print("\nFound Na values at the end")
+        commonEnd = np.minimum(waterlevelFrame["Time"][notNaWL].iloc[-1], ratesFrame["Datum"][notNaRates].iloc[-1])
+        ratesFrame = ratesFrame[ratesFrame["Datum"] <= commonEnd]
+        waterlevelFrame = waterlevelFrame[waterlevelFrame["Time"] <= commonEnd]
     return waterlevelFrame, ratesFrame
 
 def check_time_gaps(timeseries):
@@ -85,7 +92,7 @@ def check_gap_length(timeseries, maxGaps, isna):
     ### and issue a warning if so
     ### void function
     counter = 1
-    priorIdx = -1
+    priorIdx = -2
     for idx, a in enumerate(isna):
         if a:
             if (priorIdx + 1) == idx:
@@ -93,10 +100,16 @@ def check_gap_length(timeseries, maxGaps, isna):
             else:
                 if counter >= maxGaps:
                     message = "\nFound a long gap:" \
-                    "\nStart: " + str(timeseries[priorIdx - counter + 1]) + \
-                    "\nEnd: " + str(timeseries[priorIdx]) + \
+                    "\nStart: " + str(timeseries.iloc[priorIdx - counter + 1]) + \
+                    "\nEnd: " + str(timeseries.iloc[priorIdx]) + \
                     "\nGap will be interpolated linearly. Expect poor deconvolution results."
-                warnings.warn(message)
+                    warnings.warn(message)
                 counter = 1
-                priorIdx = idx
+            priorIdx = idx
+    if counter >= maxGaps:
+        message = "\nFound a long gap:" \
+        "\nStart: " + str(timeseries.iloc[priorIdx - counter + 1]) + \
+        "\nEnd: " + str(timeseries.iloc[priorIdx]) + \
+        "\nGap will be interpolated linearly. Expect poor deconvolution results."
+        warnings.warn(message)
 

@@ -11,7 +11,7 @@ from scipy.linalg import svd, pinv
 # start time of time series to look at
 starttime = datetime.strptime("01/01/2001","%d/%m/%Y")
 # end time of time series to look at
-endtime = datetime.strptime("01/01/2008","%d/%m/%Y")
+endtime = datetime.strptime("31/12/2005","%d/%m/%Y")
 # amount of time nodes of the response function
 # increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
 # if no amount is given by the user the amount will be equal to the amount of rates
@@ -38,6 +38,8 @@ beginningWeightPar = None
 maxGaps = 10
 # provide your own assumed natural water level. Very important if the time series does not exhibit recovery periods!
 wlNatIn = None
+# known transmissivity in m**2/d (pumping test 1979)
+transmissivity = 320
 
 ### prepare time series
 
@@ -52,15 +54,14 @@ timeseries, waterlevel, rates, isInterWl, isInterRates = process_data(waterlevel
 
 ### set up nodes
 
-timeLength = timeseries[-1] - timeseries[0]
-nodes = get_nodes(amountNodes = amountNodes, interpolation="linear", startNode = startNode, timeLength = timeLength)
+nodes = get_nodes(amountNodes = amountNodes, interpolation="linear", startNode = startNode, timeseries = timeseries)
 
 ### calculate initial values
 
 if not wlNatIn:
     wlNatIn = get_initial_wlNat(waterlevel = waterlevel)
 yIn = rates
-zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn, pNat = pNat)
+zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn, wlNat = wlNatIn, timeseries = timeseries)
 xIn = np.insert(yIn, 0, wlNatIn)
 
 ### get weighting functions

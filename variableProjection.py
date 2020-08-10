@@ -156,9 +156,9 @@ def generate_convMatrix(z, rateLength):
 def calculate_entries(start, end, z, nodes):
     ### calculate each entry of the convolution matrix which corresponds to each pumping period in time (only works for constant rate intervals!)
     if start == 0:
-        idxs = np.where(nodes <= np.ln(end))[0]
+        idxs = np.where(nodes <= np.log(end))[0]
     else:
-        idxs = np.where((np.ln(start) <= nodes) & (nodes <= np.ln(end)))[0]
+        idxs = np.where((np.log(start) <= nodes) & (nodes <= np.log(end)))[0]
     if(len(idxs) == 0):
         raise Exception("One pumping period does not enclose at least one node interval. The resolution of nodes is too low!")
     idxs = np.append(idxs, idxs[-1] + 1)
