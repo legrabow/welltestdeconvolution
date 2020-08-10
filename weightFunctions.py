@@ -17,7 +17,7 @@ def get_rateError_weight(wlNat, waterlevel, rates):
     rew = len(rates) * np.linalg.norm(drawdown) ** 2 / (len(waterlevel) * np.linalg.norm(rates) ** 2)
     return rew
 
-def get_derivate_weight(wlNat, waterlevel, rates):
+def get_derivate_weight(wlNat, waterlevel):
     ### calculate weight based on average square drawdown
     drawdown = wlNat - waterlevel
     dw = np.linalg.norm(drawdown) ** 2 / len(waterlevel)

@@ -82,7 +82,7 @@ if weightingFunctions["pumping"]:
 ## general weights
 
 weights["rew"] = get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
-weights["dw"] = get_derivate_weight()
+weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
 
 ### solve the non-linear LTS-Problem
 
