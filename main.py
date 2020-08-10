@@ -86,7 +86,7 @@ weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
 
 ### solve the non-linear LTS-Problem
 
-y, z, pNat = variable_projection(nodes, waterlevel, xIn, rates, pNatIn, zIn, stoppingCriterion, weights, stepsize)
+y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, stepsize)
 
 ### show result
 

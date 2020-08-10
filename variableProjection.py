@@ -1,16 +1,16 @@
-def variable_projection(nodes, waterlevel, x, rates, pNat, z, sc, weights, stepsize, errorIn = None):
+def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries, errorIn = None):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
     ### recursive function
 
-    fMat = generate_fMatrix(rew, z, rateLength, wlLength)
-    vVec = generate_vVector(rew, dw, z, waterlevel, rates)
+    fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
+    vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
 
     ## calculate error
     error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
     if errorIn:
         errorRatio = error / errorIn
         if(errorRatio <= sc):
-            return x[:(rateLength + 1)], z, x[0]
+            return x[:(len(rates) + 1)], z, x[0]
     else:
         errorIn = error
 
@@ -21,24 +21,23 @@ def variable_projection(nodes, waterlevel, x, rates, pNat, z, sc, weights, steps
 
     ## solve non-linear part
     currentPosition = fMat.dot(x) - vVec
-    zJacobian = generate_jacobian(nodes, z, y, dw)
+    zJacobian = generate_jacobian(nodes, z, y, weights["dw"], len(rates))
     totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
     dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
-    x = x + dTotal[:(rateLength + 1)]
-    z = z + dTotal[(rateLength + 1):]
+    x = x + dTotal[:(len(rates) + 1)]
+    z = z + dTotal[(len(rates) + 1):]
 
     ## call again
-    variable_projection(nodes, waterlevel, x, rates, pNat, z, sc, weights, stoppingCriterion, stepsize, errorIn)
- 
+    variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries, errorIn)
 
-def generate_vVector(rew, dw, z, waterlevel, rates):
+def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
     ### calculate the vector that contains the waterlevel, the wheighted rates
     ### and the smoothness measure for the total error function
-    smoothness = generate_smoothnessMeasure()
+    smoothness = generate_smoothnessMeasure(dw, nodes, z)
     vVec = [waterlevel, rates * np.sqrt(rew), smoothness]
     return vVec
 
-def generate_smoothnessMeasure(dw):
+def generate_smoothnessMeasure(dw, nodes, z):
     ### calulculate the smoothness measure to minimize
     sdMat = generate_secondDerivativeMatrix(nodes)
     expected = np.zeros(len(nodes))
@@ -46,16 +45,16 @@ def generate_smoothnessMeasure(dw):
     smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
     return smoothness
 
-def generate_jacobian(nodes, z, y, dw):
+def generate_jacobian(nodes, z, y, dw, rateLength):
     ### calculate the jacobian matrix of the error measure with respect to the 
     ### response values for Gauss-Newton
-    jacobianConvolution = generate_jacobianConvolution(nodes, z, y)
+    jacobianConvolution = generate_jacobianConvolution(nodes, z, y, rateLength)
     sdMat = generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
     jacobianRates = np.zeros(shape=(len(y), len(z)))
     zJacobian = np.concatenate((jacobianConvolution, sdMat, jacobianRates))
     return zJacobian
 
-def generate_jacobianConvolution(nodes, z, y):
+def generate_jacobianConvolution(nodes, z, y, rateLength):
     ### calculate the jacobian matrix of the convolution matrix with respect to the response values
     jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
     for k in xrange(len(nodes)):
@@ -123,7 +122,7 @@ def generate_secondDerivativeMatrix(nodes):
     ### calculate the matrix measuring the sinus of the angle between each interpolating
     ### function of the response estimate
     dimRow = len(nodes)
-    sdMat = np.zeros(shape = (dimRow, dimRow)
+    sdMat = np.zeros(shape = (dimRow, dimRow))
     for idx in xrange(dimRow):
         angleSideAfter = nodes[idx + 1] - nodes[idx]
         if idx == 0:
@@ -136,21 +135,21 @@ def generate_secondDerivativeMatrix(nodes):
             sdMat[idx, idx + 1] = 1 / angleSideBefore
     return sdMat
 
-def generate_fMatrix(rew, z, rateLength, wlLength):
+def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
     ### calculate the matrix that will be multiplied with the presumed rates for the total error function
-    convMat = generate_convMatrix(z, rateLength)
-    pNatIdentity = np.identity(wlLength)
+    convMat = generate_convMatrix(z, rateLength, nodes, timeseries)
+    wlNatIdentity = np.full(wlLength,1)
     rateIdentity = np.identity(rateLength) * np.sqrt(rew)
-    fMat = [[pNatIdentity, -convMat], [0, rateIdentity], [0, 0]]
+    fMat = [[wlNatIdentity, -convMat], [0, rateIdentity], [0, 0]]
     return fMat
     
 
-def generate_convMatrix(z, rateLength):
+def generate_convMatrix(z, rateLength, nodes, timeseries):
     ### calculate the actual convolution matrix (assuming constant rate intervals!)
-    v1 = [calculate_entries(start = t - 1, end = t, z) for t in 1:int(np.exp(nodes[-1]))]
+    v1 = [calculate_entries(tStart, tEnd, z, nodes) for tStart, tEnd in zip(timeseries, timeseries[1:])]
     convMat = np.zeros(shape=(len(v1),rateLength))
     for i in xrange(rateLength):
-            convMat[i:, i] = v1[:- i]
+            convMat[i:, i] = v1[:(len(v1)- i)]
     return convMat
 
 def calculate_entries(start, end, z, nodes):
@@ -160,12 +159,14 @@ def calculate_entries(start, end, z, nodes):
     else:
         idxs = np.where((np.log(start) <= nodes) & (nodes <= np.log(end)))[0]
     if(len(idxs) == 0):
-        raise Exception("One pumping period does not enclose at least one node interval. The resolution of nodes is too low!")
-    idxs = np.append(idxs, idxs[-1] + 1)
+        warnings.warn("One pumping period does not enclose at least one node interval. The resolution of nodes might be too low!") 
+        idxs = np.array([min(np.where(nodes >= np.log(end))[0])])
+    else:
+        idxs = np.append(idxs, idxs[-1] + 1)
     entry = 0
     for idx in idxs:
         idxBefore = idx - 1
-        subSum = evaluate_integral(nodeCurrent = nodes[idx], nodeBefore = nodes[idxBefore], start, end, zBefore = [idxBefore], zCurrent = z[idx])
+        subSum = evaluate_integral(nodes[idx], nodes[idxBefore], start, end, z[idxBefore], z[idx])
         entry += subSum
     return entry
     
@@ -183,7 +184,7 @@ def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, z
     else:
         slope = (zCurrent - zBefore) / (nodeCurrent - nodeBefore)
         intersect = zCurrent - slope * nodeCurrent
-        if round(slope, 4) != 0:
+        if round(slope, 6) != 0:
             result = ((upperLim - 1 / slope) * np.exp(slope * upperLim) - (lowerLim - 1 / slope) * np.exp(slope * lowerLim)) / slope
         else:
             result = (upperLim ** 2 - lowerLim ** 2) / 2
@@ -198,13 +199,14 @@ def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
     else:
         lowerLim = np.maximum(np.log(start), nodeBefore)
     if upperLim < lowerLim:
+        ## wellbore storage case
         slope = 1
         intersect = 0
         result = np.exp(upperLim * slope) / slope
     else:
         slope = (zCurrent - zBefore) / (nodeCurrent - nodeBefore)
         intersect = zCurrent - slope * nodeCurrent
-        if round(slope, 4) != 0:
+        if round(slope, 6) != 0:
             result = (np.exp(upperLim * slope) - np.exp(lowerLim * slope)) / slope
         else:
             result = upperLim - lowerLim
