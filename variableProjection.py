@@ -11,6 +11,8 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
         errorRatio = error / errorIn
         if(errorRatio <= sc):
             return x[:(len(rates) + 1)], z, x[0]
+        else:
+            print(errorRatio)
     else:
         errorIn = error
 
@@ -21,7 +23,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
 
     ## solve non-linear part
     currentPosition = fMat.dot(x) - vVec
-    zJacobian = generate_jacobian(nodes, z, y, weights["dw"], len(rates))
+    zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates))
     totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
     dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
     x = x + dTotal[:(len(rates) + 1)]
@@ -52,7 +54,7 @@ def generate_jacobian(nodes, z, y, dw, rateLength):
     jacobianConvolution = generate_jacobianConvolution(nodes, z, y, rateLength)
     sdMat = generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
     jacobianRates = np.zeros(shape=(len(y), len(z)))
-    zJacobian = np.concatenate((jacobianConvolution, sdMat, jacobianRates))
+    zJacobian = np.concatenate((jacobianConvolution, jacobianRates, sdMat))
     return zJacobian
 
 def generate_jacobianConvolution(nodes, z, y, rateLength):
@@ -63,49 +65,54 @@ def generate_jacobianConvolution(nodes, z, y, rateLength):
     ###           one pumping period, as the rest is symmetric
     jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
     for k in xrange(len(z)):
-        v1 = np.zeros(int(np.exp(nodes[-1])))
+        v1 = np.zeros((int(np.exp(nodes[-1])), 1))
         if k == 0:
-            startTriangle = 0
-            endTriangle = np.ceil(np.exp(nodes[k + 1]))
-            derivativeEntry = evaluate_integral(nodes[0], nodes[-1], startTriangle, endTriangle, z[-1], z[0])
+            endTriangle = np.exp(nodes[k + 1])
+            timeIdxStart = 0
+            timeIdxEnd = np.searchsorted(timeseries,[endTriangle])[0]
+            derivativeEntry = evaluate_integral(nodes[0], nodes[-1], 0, endTriangle, z[-1], z[0])
             v1[0] = derivativeEntry
             nodeCurrent = nodes[k + 1]
             nodeBefore = nodes[k]
             zCurrent = z[k + 1]
             zBefore = z[k]
-            for timeIdx in xrange(startTriangle, endTriangle):
-                subStart = timeIdx
-                subEnd = timeIdx + 1
+            for timeIdx in xrange(timeIdxStart, timeIdxEnd):
+                subStart = timeseries[timeIdx]
+                subEnd = timeseries[timeIdx + 1]
                 derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, True)
-                v1[timeIdx] += derivateEntry
+                v1[timeIdx] += derivativeEntry
         else:
-            startTriangle = np.floor(np.exp(nodes[k - 1]))
-            endTriangle = np.ceil(np.exp(nodes[k]))
             nodeCurrent = nodes[k]
             nodeBefore = nodes[k - 1]
+            startTriangle = np.exp(nodeBefore)
+            endTriangle = round(np.exp(nodeCurrent), 6)
+            timeIdxStart = np.searchsorted(timeseries,[startTriangle])[0] - 1
+            timeIdxEnd = np.searchsorted(timeseries,[endTriangle])[0]
             zCurrent = z[k]
             zBefore = z[k - 1]
-            for timeIdx in xrange(startTriangle, endTriangle):
-                subStart = timeIdx
-                subEnd = timeIdx + 1
+            for timeIdx in xrange(timeIdxStart, timeIdxEnd):
+                subStart = timeseries[timeIdx]
+                subEnd = timeseries[timeIdx + 1]
                 derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, False)
-                v1[timeIdx] = derivateEntry
-            if k != (len(k) - 1):
-                startTriangle = np.floor(np.exp(nodes[k]))
-                endTriangle = np.ceil(np.exp(nodes[k + 1]))
+                v1[timeIdx] = derivativeEntry
+            if k != (len(z) - 1):
+                startTriangle = np.exp(nodes[k])
+                endTriangle = round(np.exp(nodes[k + 1]), 6)
+                timeIdxStart = np.searchsorted(timeseries,[startTriangle])[0] - 1
+                timeIdxEnd = np.searchsorted(timeseries,[endTriangle])[0]
                 nodeCurrent = nodes[k + 1]
                 nodeBefore = nodes[k]
                 zCurrent = z[k + 1]
                 zBefore = z[k]
-                for timeIdx in xrange(startTriangle, endTriangle):
-                    subStart = timeIdx
-                    subEnd = timeIdx + 1
+                for timeIdx in xrange(timeIdxStart, timeIdxEnd):
+                    subStart = timeseries[timeIdx]
+                    subEnd = timeseries[timeIdx + 1]
                     derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, True)
-                    v1[timeIdx] += derivateEntry
+                    v1[timeIdx] += derivativeEntry
         
         kthDerivativeMat = np.zeros(shape=(len(v1),rateLength))
         for i in xrange(rateLength):
-                kthDerivativeMat[i:, i] = v1[:- i]
+                kthDerivativeMat[i:, i] = v1[:len(v1)- i]
         jacobianConvolution[:,k] = - kthDerivativeMat.dot(y)
     return jacobianConvolution
 
