@@ -34,7 +34,8 @@ def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
     ### calculate the vector that contains the waterlevel, the wheighted rates
     ### and the smoothness measure for the total error function
     smoothness = generate_smoothnessMeasure(dw, nodes, z)
-    vVec = [waterlevel, rates * np.sqrt(rew), smoothness]
+    vVec = np.concatenate([waterlevel, rates * np.sqrt(rew), smoothness])
+    vVec = vVec.reshape((len(vVec), 1))
     return vVec
 
 def generate_smoothnessMeasure(dw, nodes, z):
@@ -56,8 +57,12 @@ def generate_jacobian(nodes, z, y, dw, rateLength):
 
 def generate_jacobianConvolution(nodes, z, y, rateLength):
     ### calculate the jacobian matrix of the convolution matrix with respect to the response values
+    ### Workflow: For the deriavtive for z[k], find the time enclosing the corresponding nodes (no
+    ###           de[k-1] until nodes[k]) and split the time by the time points that lie in that ti
+    ###           me range. Evaluate the integral for each subinterval. Only do the calculation for 
+    ###           one pumping period, as the rest is symmetric
     jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
-    for k in xrange(len(nodes)):
+    for k in xrange(len(z)):
         v1 = np.zeros(int(np.exp(nodes[-1])))
         if k == 0:
             startTriangle = 0
@@ -132,16 +137,23 @@ def generate_secondDerivativeMatrix(nodes):
             # sign inverted? Typo in schroeter et al 2004?
             angleSideBefore =  nodes[idx] - nodes[idx - 1]
             sdMat[idx, idx + 1] = 1 / angleSideAfter
-            sdMat[idx, idx] = (angleSideAfter + angleSideBefore) / (angleSideAfter * angleSideBefore)
+            sdMat[idx, idx] = - (angleSideAfter + angleSideBefore) / (angleSideAfter * angleSideBefore)
             sdMat[idx, idx - 1] = 1 / angleSideBefore
     return sdMat
 
 def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
     ### calculate the matrix that will be multiplied with the presumed rates for the total error function
+    ## create skeleton for convolution error measure
     convMat = generate_convMatrix(z, rateLength, nodes, timeseries)
-    wlNatIdentity = np.full(wlLength,1)
+    wlNatUnit = np.ones((wlLength, 1))
+    convError = np.hstack([wlNatUnit, convMat])
+    ## create skeleton for rate error measure
     rateIdentity = np.identity(rateLength) * np.sqrt(rew)
-    fMat = [[wlNatIdentity, -convMat], [0, rateIdentity], [0, 0]]
+    ratesError = np.hstack([np.zeros((rateLength, 1)), rateIdentity])
+    ## create skeleton for smoothness measure
+    smthsError = np.zeros((len(nodes) - 1,rateLength + 1))
+    ## put them all together
+    fMat = np.vstack([convError, ratesError, smthsError])
     return fMat
     
 

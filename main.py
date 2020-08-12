@@ -50,7 +50,9 @@ ratesRaw = get_rates(starttime = starttime, endtime = endtime)
 
 ## clean and merge data
 
-timeseries, waterlevel, rates, isInterWl, isInterRates = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
+timeseries, waterlevelTot, ratesTot, isInterWl, isInterRates = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
+waterlevel = waterlevelTot[1:]
+rates = ratesTot[1:]
 
 ### set up nodes
 
@@ -59,10 +61,11 @@ nodes = get_nodes(amountNodes = amountNodes, interpolation="linear", startNode =
 ### calculate initial values
 
 if not wlNatIn:
-    wlNatIn = get_initial_wlNat(waterlevel = waterlevel)
+    wlNatIn = get_initial_wlNat(waterlevel = waterlevelTot)
 yIn = rates
 zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn, wlNat = wlNatIn, timeseries = timeseries)
 xIn = np.insert(yIn, 0, wlNatIn)
+xIn = xIn.reshape((len(xIn), 1))
 
 ### get weighting functions
 
@@ -86,7 +89,7 @@ weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
 
 ### solve the non-linear LTS-Problem
 
-y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, stepsize)
+y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, stepsize, timeseries)
 
 ### show result
 
