@@ -1,4 +1,9 @@
-def get_waterlevel(starttime, endtime):
+from datetime import datetime
+import warnings
+import pandas as pd
+import numpy as np
+
+def get_waterlevel(starttime, endtime, dataDir):
     ### read in water level data
     ### return a pandas data frame
     path = dataDir + "/waterlevel_daily.csv"
@@ -9,7 +14,7 @@ def get_waterlevel(starttime, endtime):
     return dataFrame
 
 
-def get_rates(starttime, endtime):
+def get_rates(starttime, endtime, dataDir):
     ### read in rates data
     ### return a pandas data frame
     path = dataDir + "/Produktionsraten_Tagesmittel.csv"

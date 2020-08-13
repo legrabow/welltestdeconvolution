@@ -1,21 +1,26 @@
+import warnings
+import numpy as np
+from scipy.linalg import svd, pinv
+
 def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
     
-    global iterationCounter
     global zOut
     global xOut
-    global fMatOut
+    #global fMatOut
     global subSums
-    global entriesConvMat
+    #global entriesConvMat
     
+    iterationCounter = 0
     errorRatio = 2 * sc
     errorIn = None
     
     while errorRatio > sc:
+        print("Start with the solving-loop...")
         zOut = z
         xOut = x
         subSums = dict()
-
+        
         fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
         vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
 
@@ -24,27 +29,29 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
         error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
         if errorIn:
             errorRatio = error / errorIn
-            print("Error ratio: " + str(errorRatio))
+            print("Calculated error ratio: " + str(errorRatio))
         else:
             errorIn = error
 
         ## solve linear part
         constant = vVec - fMat.dot(x)
+        print("Solve the linear sub problem")
         dx = pinv(fMat).dot(constant)
         x = x + dx
 
         ## solve non-linear part
         currentPosition = fMat.dot(x) - vVec
-        zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates))
+        zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries)
         totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
+        print("Solve the non-linear sub problem")
         dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
 
 
         x = x + dTotal[:(len(rates) + 1)]
         z = z + dTotal[(len(rates) + 1):]
 
-        entriesConvMat[str(iterationCounter)] = subSums
-        fMatOut[str(iterationCounter)] = fMat
+        #entriesConvMat[str(iterationCounter)] = subSums
+        #fMatOut[str(iterationCounter)] = fMat
         iterationCounter += 1
 
     return x[:(len(rates) + 1)], z, x[0]
@@ -52,6 +59,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
 def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
     ### calculate the vector that contains the waterlevel, the wheighted rates
     ### and the smoothness measure for the total error function
+    print("Generate the vVector")
     smoothness = generate_smoothnessMeasure(dw, nodes, z)
     vVec = np.vstack([waterlevel, rates * np.sqrt(rew), smoothness])
     return vVec
@@ -64,21 +72,23 @@ def generate_smoothnessMeasure(dw, nodes, z):
     smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
     return smoothness
 
-def generate_jacobian(nodes, z, y, dw, rateLength):
+def generate_jacobian(nodes, z, y, dw, rateLength, timeseries):
     ### calculate the jacobian matrix of the error measure with respect to the 
     ### response values for Gauss-Newton
-    jacobianConvolution = generate_jacobianConvolution(nodes, z, y, rateLength)
+    print("Generate the jacobian matrix with respect to the response values:")
+    jacobianConvolution = generate_jacobianConvolution(nodes, z, y, rateLength, timeseries)
     sdMat = generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
     jacobianRates = np.zeros(shape=(len(y), len(z)))
     zJacobian = np.concatenate((jacobianConvolution, jacobianRates, sdMat))
     return zJacobian
 
-def generate_jacobianConvolution(nodes, z, y, rateLength):
+def generate_jacobianConvolution(nodes, z, y, rateLength, timeseries):
     ### calculate the jacobian matrix of the convolution matrix with respect to the response values
     ### Workflow: For the deriavtive for z[k], find the time enclosing the corresponding nodes (no
     ###           de[k-1] until nodes[k]) and split the time by the time points that lie in that ti
     ###           me range. Evaluate the integral for each subinterval. Only do the calculation for 
     ###           one pumping period, as the rest is symmetric
+    print("Generate the convolution part of jacobian")
     timeLength = int(np.exp(nodes[-1]))
     jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
     for k in xrange(len(z)):
@@ -150,6 +160,7 @@ def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefor
 def generate_secondDerivativeMatrix(nodes):
     ### calculate the matrix measuring the sinus of the angle between each interpolating
     ### function of the response estimate
+    print("Generate the second-derivative-measure matrix")
     dimCol = len(nodes)
     sdMat = np.zeros(shape = ((dimCol - 1), dimCol))
     for idx in xrange((dimCol - 1)):
@@ -168,6 +179,7 @@ def generate_secondDerivativeMatrix(nodes):
 def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
     ### calculate the matrix that will be multiplied with the presumed rates for the total error function
     ## create skeleton for convolution error measure
+    print("Generate the fMatrix")
     convMat = generate_convMatrix(z, rateLength, nodes, timeseries)
     wlNatUnit = np.ones((wlLength, 1))
     convError = np.hstack([wlNatUnit, convMat])
@@ -183,6 +195,7 @@ def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
 
 def generate_convMatrix(z, rateLength, nodes, timeseries):
     ### calculate the actual convolution matrix (assuming constant rate intervals!)
+    print("Generate the convolution matrix")
     v1 = [calculate_entries(tStart, tEnd, z, nodes) for tStart, tEnd in zip(timeseries, timeseries[1:])]
     convMat = np.zeros(shape=(len(v1),rateLength))
     for i in xrange(rateLength):

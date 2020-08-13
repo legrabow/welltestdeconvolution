@@ -1,3 +1,5 @@
+import numpy as np
+
 def get_tidal_weighting(timeseries):
     return
 

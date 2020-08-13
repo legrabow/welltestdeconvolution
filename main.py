@@ -1,17 +1,21 @@
 ### main script for deconvolution
 
+## import build-in
 from datetime import datetime
-import warnings
-import pandas as pd
 import numpy as np
-from scipy.linalg import svd, pinv
+
+## import other functions
+from functions import *
+from data_preparation import *
+from variableProjection import *
+from weightFunctions import *
 
 ## important parameters
 
 # start time of time series to look at
 starttime = datetime.strptime("01/01/2001","%d/%m/%Y")
-# end time of time series to look at
-endtime = datetime.strptime("31/12/2005","%d/%m/%Y")
+# end time of time series to look at (standard: 31/12/2005)
+endtime = datetime.strptime("01/02/2006","%d/%m/%Y")
 # amount of time nodes of the response function
 # increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
 # if no amount is given by the user the amount will be equal to the amount of rates
@@ -41,14 +45,14 @@ wlNatIn = None
 # known transmissivity in m**2/d (pumping test 1979)
 transmissivity = 320
 # relative size to scale down the gradient vector found in Gauss-Newton
-stepsize = 0.000005
+stepsize = 0.0005
 
 ### prepare time series
 
 ## get barometrically corrected data
 
-waterlevelRaw = get_waterlevel(starttime = starttime, endtime = endtime)
-ratesRaw = get_rates(starttime = starttime, endtime = endtime)
+waterlevelRaw = get_waterlevel(starttime = starttime, endtime = endtime, dataDir = dataDir)
+ratesRaw = get_rates(starttime = starttime, endtime = endtime, dataDir = dataDir)
 
 ## clean and merge data
 
@@ -92,14 +96,13 @@ weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
 ### set up monitoring objects
 fMatOut = dict()
 entriesConvMat = dict()
-iterationCounter = 0
 
 
 ### solve the non-linear LTS-Problem
 
 y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, stepsize, timeseries)
 
-### show result
+    ### show result
 
 if False:
 

@@ -1,3 +1,6 @@
+import warnings
+import numpy as np
+
 def get_nodes(amountNodes, interpolation, startNode, timeseries):
     ### calculate and return the nodes corresponding to the logarithmic time steps of the response function
     if not amountNodes:
