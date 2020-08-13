@@ -41,7 +41,7 @@ wlNatIn = None
 # known transmissivity in m**2/d (pumping test 1979)
 transmissivity = 320
 # relative size to scale down the gradient vector found in Gauss-Newton
-stepsize = 0.05
+stepsize = 0.000005
 
 ### prepare time series
 
@@ -88,6 +88,12 @@ if weightingFunctions["pumping"]:
 
 weights["rew"] = get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
 weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
+
+### set up monitoring objects
+fMatOut = dict()
+entriesConvMat = dict()
+iterationCounter = 0
+
 
 ### solve the non-linear LTS-Problem
 

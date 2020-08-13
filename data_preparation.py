@@ -112,4 +112,3 @@ def check_gap_length(timeseries, maxGaps, isna):
         "\nEnd: " + str(timeseries.iloc[priorIdx]) + \
         "\nGap will be interpolated linearly. Expect poor deconvolution results."
         warnings.warn(message)
-

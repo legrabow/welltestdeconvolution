@@ -1,43 +1,53 @@
-def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries, errorIn = None):
+def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
-    ### recursive function
     
+    global iterationCounter
     global zOut
     global xOut
+    global fMatOut
+    global subSums
+    global entriesConvMat
+    
+    errorRatio = 2 * sc
+    errorIn = None
+    
+    while errorRatio > sc:
+        zOut = z
+        xOut = x
+        subSums = dict()
 
-    fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
-    vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
+        fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
+        vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
 
-    ## calculate error
-    error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
-    if errorIn:
-        errorRatio = error / errorIn
-        if(errorRatio <= sc):
-            return x[:(len(rates) + 1)], z, x[0]
+
+        ## calculate error
+        error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
+        if errorIn:
+            errorRatio = error / errorIn
+            print("Error ratio: " + str(errorRatio))
         else:
-            print(errorRatio)
-    else:
-        errorIn = error
+            errorIn = error
 
-    ## solve linear part
-    constant = vVec - fMat.dot(x)
-    dx = pinv(fMat).dot(constant)
-    x = x + dx
-    
-    ## solve non-linear part
-    currentPosition = fMat.dot(x) - vVec
-    zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates))
-    totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
-    dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
+        ## solve linear part
+        constant = vVec - fMat.dot(x)
+        dx = pinv(fMat).dot(constant)
+        x = x + dx
 
-    
-    x = x + dTotal[:(len(rates) + 1)]
-    z = z + dTotal[(len(rates) + 1):]
+        ## solve non-linear part
+        currentPosition = fMat.dot(x) - vVec
+        zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates))
+        totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
+        dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
 
-    zOut = z
-    xOut = x
-    ## call again
-    variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries, errorIn)
+
+        x = x + dTotal[:(len(rates) + 1)]
+        z = z + dTotal[(len(rates) + 1):]
+
+        entriesConvMat[str(iterationCounter)] = subSums
+        fMatOut[str(iterationCounter)] = fMat
+        iterationCounter += 1
+
+    return x[:(len(rates) + 1)], z, x[0]
 
 def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
     ### calculate the vector that contains the waterlevel, the wheighted rates
@@ -181,6 +191,8 @@ def generate_convMatrix(z, rateLength, nodes, timeseries):
 
 def calculate_entries(start, end, z, nodes):
     ### calculate each entry of the convolution matrix which corresponds to each pumping period in time (only works for constant rate intervals!)
+    #print("Calculate conv-entry for the time range:")
+    #print("Start: " + str(start) + " - End: " + str(end))
     if start == 0:
         idxs = np.where(nodes <= np.log(end))[0]
     else:
@@ -194,6 +206,7 @@ def calculate_entries(start, end, z, nodes):
     for idx in idxs:
         idxBefore = idx - 1
         subSum = evaluate_integral(nodes[idx], nodes[idxBefore], start, end, z[idxBefore], z[idx])
+        monitor_integral(subSum, nodes[idxBefore], nodes[idx], start, end, z[idxBefore], z[idx])
         entry += subSum
     return entry
     
@@ -239,6 +252,23 @@ def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
             result = upperLim - lowerLim
     result = result * np.exp(intersect)
     return result
+
+def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurrent):
+    global subSums
+    entryKey = str(start) + "..." + str(end)
+    subSumResult = {
+        "subSum":subSum,
+        "nodeBefore":nodeBefore,
+        "nodeCurrent":nodeCurrent,
+        "zBefore":zBefore,
+        "zCurrent":zCurrent
+    }
+    if entryKey in subSums:
+        entryList = subSums[entryKey]
+        entryList.append(subSumResult)
+    else:
+        entryList = [subSumResult]
+    subSums[entryKey] = entryList
 
 
 
