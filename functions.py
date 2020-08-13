@@ -32,10 +32,10 @@ def get_initial_responses(nodes, waterlevel, rates, wlNat, timeseries):
     np.fill_diagonal(radialFlow, firstIntegral)
     convolution = radialFlow.dot(rates)
     drawdown = wlNat - waterlevel
-    rfCoef = drawdown.dot(convolution) / np.linalg.norm(convolution) ** 2
+    rfCoef = np.vdot(convolution, drawdown) / np.linalg.norm(convolution) ** 2
     ## calculate well bore storage coefficient
     wbsCoef = rfCoef * np.exp(-nodes[0])
     ## create response array
-    responsesRadial = np.full(shape = (len(nodes) - 1), fill_value = np.log(rfCoef))
-    responsesTotal = np.insert(responsesRadial, 0, np.log(wbsCoef))
+    responsesRadial = np.full(shape = ((len(nodes) - 1), 1), fill_value = np.log(rfCoef))
+    responsesTotal = np.insert(responsesRadial, 0, np.log(wbsCoef), axis = 0)
     return responsesTotal

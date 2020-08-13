@@ -40,6 +40,8 @@ maxGaps = 10
 wlNatIn = None
 # known transmissivity in m**2/d (pumping test 1979)
 transmissivity = 320
+# relative size to scale down the gradient vector found in Gauss-Newton
+stepsize = 0.05
 
 ### prepare time series
 
@@ -51,8 +53,9 @@ ratesRaw = get_rates(starttime = starttime, endtime = endtime)
 ## clean and merge data
 
 timeseries, waterlevelTot, ratesTot, isInterWl, isInterRates = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
-waterlevel = waterlevelTot[1:]
-rates = ratesTot[1:]
+waterlevel = waterlevelTot[1:,]
+rates = ratesTot[1:,]
+
 
 ### set up nodes
 
@@ -64,8 +67,7 @@ if not wlNatIn:
     wlNatIn = get_initial_wlNat(waterlevel = waterlevelTot)
 yIn = rates
 zIn = get_initial_responses(nodes = nodes, waterlevel = waterlevel, rates = yIn, wlNat = wlNatIn, timeseries = timeseries)
-xIn = np.insert(yIn, 0, wlNatIn)
-xIn = xIn.reshape((len(xIn), 1))
+xIn = np.insert(yIn, 0,wlNatIn, axis=0)
 
 ### get weighting functions
 
@@ -93,8 +95,8 @@ y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCr
 
 ### show result
 
+if False:
 
-
-### optional scripts:
-check_p1_contribtution(nodes, z, q, pNat, waterlevel)
-check_rank()
+    ### optional scripts:
+    check_p1_contribtution(nodes, z, q, pNat, waterlevel)
+    check_rank()

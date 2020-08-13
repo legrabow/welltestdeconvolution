@@ -43,8 +43,8 @@ def process_data(waterlevelFrame, ratesFrame, maxGaps):
     ## convert data to expected data types
     timeseries = waterlevelFrame["Time"] - waterlevelFrame["Time"].iloc[0]
     timeseries = np.array(timeseries) / pd.Timedelta(1, unit='d')
-    waterlevel = np.array(waterlevelFrame["Waterlevel"], dtype = "float")
-    rates = np.array(ratesFrame["Gesamt"], dtype = "float")
+    waterlevel = np.array(waterlevelFrame["Waterlevel"], dtype = "float", ndmin = 2).T
+    rates = np.array(ratesFrame["Gesamt"], dtype = "float", ndmin = 2).T
     return timeseries, waterlevel, rates, isInterWl, isInterRates
 
 def cut_time_range(waterlevelFrame, ratesFrame):

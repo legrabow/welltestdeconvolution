@@ -1,6 +1,9 @@
 def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries, errorIn = None):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
     ### recursive function
+    
+    global zOut
+    global xOut
 
     fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
     vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
@@ -20,15 +23,19 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
     constant = vVec - fMat.dot(x)
     dx = pinv(fMat).dot(constant)
     x = x + dx
-
+    
     ## solve non-linear part
     currentPosition = fMat.dot(x) - vVec
     zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates))
     totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
     dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
+
+    
     x = x + dTotal[:(len(rates) + 1)]
     z = z + dTotal[(len(rates) + 1):]
 
+    zOut = z
+    xOut = x
     ## call again
     variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries, errorIn)
 
@@ -36,14 +43,13 @@ def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
     ### calculate the vector that contains the waterlevel, the wheighted rates
     ### and the smoothness measure for the total error function
     smoothness = generate_smoothnessMeasure(dw, nodes, z)
-    vVec = np.concatenate([waterlevel, rates * np.sqrt(rew), smoothness])
-    vVec = vVec.reshape((len(vVec), 1))
+    vVec = np.vstack([waterlevel, rates * np.sqrt(rew), smoothness])
     return vVec
 
 def generate_smoothnessMeasure(dw, nodes, z):
     ### calulculate the smoothness measure to minimize
     sdMat = generate_secondDerivativeMatrix(nodes)
-    expected = np.zeros(len(nodes) - 1)
+    expected = np.zeros((len(nodes) - 1, 1))
     expected[0] = 1
     smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
     return smoothness
@@ -63,9 +69,10 @@ def generate_jacobianConvolution(nodes, z, y, rateLength):
     ###           de[k-1] until nodes[k]) and split the time by the time points that lie in that ti
     ###           me range. Evaluate the integral for each subinterval. Only do the calculation for 
     ###           one pumping period, as the rest is symmetric
+    timeLength = int(np.exp(nodes[-1]))
     jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
     for k in xrange(len(z)):
-        v1 = np.zeros((int(np.exp(nodes[-1])), 1))
+        v1 = np.zeros((timeLength, 1))
         if k == 0:
             endTriangle = np.exp(nodes[k + 1])
             timeIdxStart = 0
@@ -112,8 +119,8 @@ def generate_jacobianConvolution(nodes, z, y, rateLength):
         
         kthDerivativeMat = np.zeros(shape=(len(v1),rateLength))
         for i in xrange(rateLength):
-                kthDerivativeMat[i:, i] = v1[:len(v1)- i]
-        jacobianConvolution[:,k] = - kthDerivativeMat.dot(y)
+                kthDerivativeMat[i:, i] = v1[:(timeLength- i),0]
+        jacobianConvolution[:,k] = np.transpose(- kthDerivativeMat.dot(y))
     return jacobianConvolution
 
 def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, goingDown):
