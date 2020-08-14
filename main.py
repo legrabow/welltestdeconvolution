@@ -26,7 +26,7 @@ amountNodes = None
 # directory where to find the rate- and water level data
 dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
 # the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
-stoppingCriterion = 10**-8
+stoppingCriterion = 10**-6
 # time of the first node in percentage of one day (so 1 > startNode > 0)
 startNode = 0.3
 # optional weights to consider
@@ -45,7 +45,7 @@ wlNatIn = None
 # known transmissivity in m**2/d (pumping test 1979)
 transmissivity = 320
 # relative size to scale down the gradient vector found in Gauss-Newton
-stepsize = 0.0005
+stepsize = 0.000005
 
 ### prepare time series
 
@@ -102,7 +102,7 @@ entriesConvMat = dict()
 
 y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, stepsize, timeseries)
 
-    ### show result
+### show result
 
 if False:
 

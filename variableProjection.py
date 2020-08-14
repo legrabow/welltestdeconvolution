@@ -1,14 +1,14 @@
 import warnings
 import numpy as np
-from scipy.linalg import svd, pinv
+from scipy.linalg import svd, pinv, lstsq
 
 def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
     
-    global zOut
-    global xOut
+    #global zOut
+    #global xOut
     #global fMatOut
-    global subSums
+    #global subSums
     #global entriesConvMat
     
     iterationCounter = 0
@@ -36,15 +36,17 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
         ## solve linear part
         constant = vVec - fMat.dot(x)
         print("Solve the linear sub problem")
-        dx = pinv(fMat).dot(constant)
+        #dx = pinv(fMat).dot(constant)
+        dx = lstsq(fMat, constant)[0]
         x = x + dx
 
         ## solve non-linear part
-        currentPosition = fMat.dot(x) - vVec
+        currentPosition = -(fMat.dot(x) - vVec)
         zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries)
         totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
         print("Solve the non-linear sub problem")
-        dTotal = pinv(totalJacobian).dot(-currentPosition) * stepsize
+        #dTotal = pinv(totalJacobian).dot(currentPosition) * stepsize
+        dTotal = lstsq(totalJacobian, currentPosition)[0] * stepsize
 
 
         x = x + dTotal[:(len(rates) + 1)]
@@ -54,7 +56,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
         #fMatOut[str(iterationCounter)] = fMat
         iterationCounter += 1
 
-    return x[:(len(rates) + 1)], z, x[0]
+    return x[1:], z, x[0]
 
 def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
     ### calculate the vector that contains the waterlevel, the wheighted rates
@@ -76,8 +78,8 @@ def generate_jacobian(nodes, z, y, dw, rateLength, timeseries):
     ### calculate the jacobian matrix of the error measure with respect to the 
     ### response values for Gauss-Newton
     print("Generate the jacobian matrix with respect to the response values:")
-    jacobianConvolution = generate_jacobianConvolution(nodes, z, y, rateLength, timeseries)
-    sdMat = generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
+    jacobianConvolution = - generate_jacobianConvolution(nodes, z, y, rateLength, timeseries)
+    sdMat = - generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
     jacobianRates = np.zeros(shape=(len(y), len(z)))
     zJacobian = np.concatenate((jacobianConvolution, jacobianRates, sdMat))
     return zJacobian
@@ -90,7 +92,7 @@ def generate_jacobianConvolution(nodes, z, y, rateLength, timeseries):
     ###           one pumping period, as the rest is symmetric
     print("Generate the convolution part of jacobian")
     timeLength = int(np.exp(nodes[-1]))
-    jacobianConvolution = np.zeros(shape=(int(np.exp(nodes[-1])), len(z)))
+    jacobianConvolution = np.zeros(shape=(timeLength, len(z)))
     for k in xrange(len(z)):
         v1 = np.zeros((timeLength, 1))
         if k == 0:
@@ -140,7 +142,7 @@ def generate_jacobianConvolution(nodes, z, y, rateLength, timeseries):
         kthDerivativeMat = np.zeros(shape=(len(v1),rateLength))
         for i in xrange(rateLength):
                 kthDerivativeMat[i:, i] = v1[:(timeLength- i),0]
-        jacobianConvolution[:,k] = np.transpose(- kthDerivativeMat.dot(y))
+        jacobianConvolution[:,k] = np.transpose(kthDerivativeMat.dot(y))
     return jacobianConvolution
 
 def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, goingDown):
@@ -180,7 +182,7 @@ def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
     ### calculate the matrix that will be multiplied with the presumed rates for the total error function
     ## create skeleton for convolution error measure
     print("Generate the fMatrix")
-    convMat = generate_convMatrix(z, rateLength, nodes, timeseries)
+    convMat = - generate_convMatrix(z, rateLength, nodes, timeseries)
     wlNatUnit = np.ones((wlLength, 1))
     convError = np.hstack([wlNatUnit, convMat])
     ## create skeleton for rate error measure
@@ -213,7 +215,7 @@ def calculate_entries(start, end, z, nodes):
     if(len(idxs) == 0):
         warnings.warn("One pumping period does not enclose at least one node interval. The resolution of nodes might be too low!") 
         idxs = np.array([min(np.where(nodes >= np.log(end))[0])])
-    else:
+    elif idxs[-1] + 1 != len(nodes):
         idxs = np.append(idxs, idxs[-1] + 1)
     entry = 0
     for idx in idxs:
@@ -231,9 +233,11 @@ def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, z
     else:
         lowerLim = np.maximum(np.log(start), nodeBefore)
     if upperLim < lowerLim:
-        slope = 1
-        intersect = 0
-        result = np.exp(upperLim * slope) * (upperLim / slope - 1 / slope ** 2)
+        ## should never happen
+        raise Exception("\nSomething went wrong in the integration domain!")
+        #slope = 1
+        #intersect = 0
+        #result = np.exp(upperLim * slope) * (upperLim / slope - 1 / slope ** 2)
     else:
         slope = (zCurrent - zBefore) / (nodeCurrent - nodeBefore)
         intersect = zCurrent - slope * nodeCurrent
