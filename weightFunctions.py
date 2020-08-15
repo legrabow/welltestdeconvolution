@@ -17,6 +17,7 @@ def get_rateError_weight(wlNat, waterlevel, rates):
     ### no GCV altertnative in use as errors are allocated for sure
     drawdown = wlNat - waterlevel
     rew = len(rates) * np.linalg.norm(drawdown) ** 2 / (len(waterlevel) * np.linalg.norm(rates) ** 2)
+    rew = 0
     return rew
 
 def get_derivate_weight(wlNat, waterlevel):

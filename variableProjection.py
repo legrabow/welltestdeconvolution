@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.linalg import svd, pinv, lstsq
 
-def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, timeseries):
+def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
     
     #global zOut
@@ -10,6 +10,8 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
     #global fMatOut
     #global subSums
     #global entriesConvMat
+    global zJacobian
+    global A
     
     iterationCounter = 0
     errorRatio = 2 * sc
@@ -21,7 +23,9 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
         xOut = x
         subSums = dict()
         
+        print("Generate the fMatrix")
         fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
+        print("Generate the vVector")
         vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
 
 
@@ -36,21 +40,33 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
         ## solve linear part
         constant = vVec - fMat.dot(x)
         print("Solve the linear sub problem")
-        #dx = pinv(fMat).dot(constant)
-        dx = lstsq(fMat, constant)[0]
-        x = x + dx
+        if weights["rew"] == 0:
+            A = fMat[:,0]
+            A = A.reshape((len(A), 1))
+            slicePoint = 0 
+            dp = np.vdot(A, constant) / (np.linalg.norm(A) ** 2)
+            x[0] += dp
+        else:
+            A = fMat
+            slicePoint = len(rates)
+            #dx = pinv(fMat).dot(constant)
+            dx = lstsq(A, constant)[0]
+            x = x + dx
 
         ## solve non-linear part
         currentPosition = -(fMat.dot(x) - vVec)
         zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries)
-        totalJacobian = np.concatenate((fMat, zJacobian), axis=1)
+
+        totalJacobian = np.hstack((A, zJacobian))
         print("Solve the non-linear sub problem")
         #dTotal = pinv(totalJacobian).dot(currentPosition) * stepsize
-        dTotal = lstsq(totalJacobian, currentPosition)[0] * stepsize
+        dTotal = lstsq(totalJacobian, currentPosition)[0]
 
-
-        x = x + dTotal[:(len(rates) + 1)]
-        z = z + dTotal[(len(rates) + 1):]
+        stepsize = find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint)
+        
+        dTotal = dTotal * stepsize
+        x[:(slicePoint + 1)] += dTotal[:(slicePoint + 1)]
+        z += dTotal[(slicePoint + 1):]
 
         #entriesConvMat[str(iterationCounter)] = subSums
         #fMatOut[str(iterationCounter)] = fMat
@@ -58,10 +74,32 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, stepsize, t
 
     return x[1:], z, x[0]
 
+def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint):
+    print("Find optimal stepsize")
+    minCondition = True
+    reducingPower = 0
+    xTest = x
+    xTest[:(slicePoint + 1)] += dTotal[:(slicePoint + 1)]
+    zTest = z
+    zTest += dTotal[(slicePoint + 1):]
+    while minCondition:
+        stepsize = 0.5 ** reducingPower
+        a = fMat.dot(x) - vVec
+        xTest = xTest * stepsize
+        zTest = zTest * stepsize
+        fMatTest = generate_fMatrix(weights["rew"], zTest, len(rates), len(waterlevel), nodes, timeseries)
+        vVecTest = generate_vVector(weights["rew"], weights["dw"], zTest, waterlevel, rates, nodes)
+        b = fMatTest.dot(xTest) - vVecTest
+        c = totalJacobian.dot(dTotal)
+        result = np.linalg.norm(a)**2 - np.linalg.norm(b)**2 - 0.5 * stepsize * np.linalg.norm(c)**2
+        minCondition = round(result, 6) < 0
+        reducingPower += 1
+    print("Stepsize found: " + str(stepsize))
+    return stepsize
+
 def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
     ### calculate the vector that contains the waterlevel, the wheighted rates
     ### and the smoothness measure for the total error function
-    print("Generate the vVector")
     smoothness = generate_smoothnessMeasure(dw, nodes, z)
     vVec = np.vstack([waterlevel, rates * np.sqrt(rew), smoothness])
     return vVec
@@ -162,7 +200,6 @@ def evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefor
 def generate_secondDerivativeMatrix(nodes):
     ### calculate the matrix measuring the sinus of the angle between each interpolating
     ### function of the response estimate
-    print("Generate the second-derivative-measure matrix")
     dimCol = len(nodes)
     sdMat = np.zeros(shape = ((dimCol - 1), dimCol))
     for idx in xrange((dimCol - 1)):
@@ -181,7 +218,6 @@ def generate_secondDerivativeMatrix(nodes):
 def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
     ### calculate the matrix that will be multiplied with the presumed rates for the total error function
     ## create skeleton for convolution error measure
-    print("Generate the fMatrix")
     convMat = - generate_convMatrix(z, rateLength, nodes, timeseries)
     wlNatUnit = np.ones((wlLength, 1))
     convError = np.hstack([wlNatUnit, convMat])
@@ -197,7 +233,6 @@ def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
 
 def generate_convMatrix(z, rateLength, nodes, timeseries):
     ### calculate the actual convolution matrix (assuming constant rate intervals!)
-    print("Generate the convolution matrix")
     v1 = [calculate_entries(tStart, tEnd, z, nodes) for tStart, tEnd in zip(timeseries, timeseries[1:])]
     convMat = np.zeros(shape=(len(v1),rateLength))
     for i in xrange(rateLength):
@@ -221,7 +256,7 @@ def calculate_entries(start, end, z, nodes):
     for idx in idxs:
         idxBefore = idx - 1
         subSum = evaluate_integral(nodes[idx], nodes[idxBefore], start, end, z[idxBefore], z[idx])
-        monitor_integral(subSum, nodes[idxBefore], nodes[idx], start, end, z[idxBefore], z[idx])
+        #monitor_integral(subSum, nodes[idxBefore], nodes[idx], start, end, z[idxBefore], z[idx])
         entry += subSum
     return entry
     

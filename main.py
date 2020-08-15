@@ -3,12 +3,14 @@
 ## import build-in
 from datetime import datetime
 import numpy as np
+import pickle
+import matplotlib.pyplot as plt
 
 ## import other functions
-from functions import *
-from data_preparation import *
-from variableProjection import *
-from weightFunctions import *
+#from functions import *
+#from data_preparation import *
+#from variableProjection import *
+#from weightFunctions import *
 
 ## important parameters
 
@@ -45,7 +47,7 @@ wlNatIn = None
 # known transmissivity in m**2/d (pumping test 1979)
 transmissivity = 320
 # relative size to scale down the gradient vector found in Gauss-Newton
-stepsize = 0.000005
+#stepsize = 0.05
 
 ### prepare time series
 
@@ -100,9 +102,31 @@ entriesConvMat = dict()
 
 ### solve the non-linear LTS-Problem
 
-y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, stepsize, timeseries)
+y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
+
+### save result
+
+output = {
+    "starttime":starttime,
+    "endtime":endtime,
+    "zIn":zIn,
+    "xIn":xIn,
+    "stoppingCriterion":stoppingCriterion,
+    "weights":weights,
+    "nodes":nodes,
+    "yOut":y,
+    "zOut":z,
+    "wlNatOut":wlNatOut,
+    "OtherNotes":""
+}
+
+fileName = str(starttime) + "..." + str(endtime)
+with open(fileName, 'wb') as outputFile:
+    pickle.dump(output, outputFile)
 
 ### show result
+
+plt.plot(nodes, z)
 
 if False:
 
