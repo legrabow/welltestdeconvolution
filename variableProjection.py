@@ -129,7 +129,7 @@ def generate_jacobianConvolution(nodes, z, y, rateLength, timeseries):
     ###           me range. Evaluate the integral for each subinterval. Only do the calculation for 
     ###           one pumping period, as the rest is symmetric
     print("Generate the convolution part of jacobian")
-    timeLength = int(np.exp(nodes[-1]))
+    timeLength = len(timeseries) - 1
     jacobianConvolution = np.zeros(shape=(timeLength, len(z)))
     for k in xrange(len(z)):
         v1 = np.zeros((timeLength, 1))
@@ -246,7 +246,7 @@ def calculate_entries(start, end, z, nodes):
     if start == 0:
         idxs = np.where(nodes <= np.log(end))[0]
     else:
-        idxs = np.where((np.log(start) <= nodes) & (nodes <= np.log(end)))[0]
+        idxs = np.where((np.log(start) < nodes) & (nodes < np.log(end)))[0]
     if(len(idxs) == 0):
         warnings.warn("One pumping period does not enclose at least one node interval. The resolution of nodes might be too low!") 
         idxs = np.array([min(np.where(nodes >= np.log(end))[0])])

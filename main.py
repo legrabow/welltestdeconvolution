@@ -102,7 +102,7 @@ entriesConvMat = dict()
 
 ### solve the non-linear LTS-Problem
 
-y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
+#y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
 
 ### save result
 
