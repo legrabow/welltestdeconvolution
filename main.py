@@ -30,7 +30,7 @@ dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
 # the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
 stoppingCriterion = 10**-6
 # time of the first node in percentage of one day (so 1 > startNode > 0)
-startNode = 0.3
+startNode = 0.2
 # optional weights to consider
 weightingFunctions = {
  "tidals":False,
@@ -92,7 +92,7 @@ if weightingFunctions["pumping"]:
 
 ## general weights
 
-weights["rew"] = get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
+weights["rew"] = 0#get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
 weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
 
 ### set up monitoring objects
@@ -116,13 +116,14 @@ output = {
     "nodes":nodes,
     "yOut":y,
     "zOut":z,
-    "wlNatOut":wlNatOut,
+    "wlNatOut":wlNat,
     "OtherNotes":""
 }
 
-fileName = str(starttime) + "..." + str(endtime)
-with open(fileName, 'wb') as outputFile:
-    pickle.dump(output, outputFile)
+if False:
+    fileName = str(starttime) + "..." + str(endtime)
+    with open(fileName, 'wb') as outputFile:
+        pickle.dump(output, outputFile)
 
 ### show result
 

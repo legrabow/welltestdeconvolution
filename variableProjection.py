@@ -10,8 +10,6 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
     #global fMatOut
     #global subSums
     #global entriesConvMat
-    global zJacobian
-    global A
     
     iterationCounter = 0
     errorRatio = 2 * sc
@@ -19,8 +17,6 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
     
     while errorRatio > sc:
         print("Start with the solving-loop...")
-        zOut = z
-        xOut = x
         subSums = dict()
         
         print("Generate the fMatrix")
@@ -31,6 +27,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
 
         ## calculate error
         error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
+
         if errorIn:
             errorRatio = error / errorIn
             print("Calculated error ratio: " + str(errorRatio))
@@ -51,7 +48,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
             slicePoint = len(rates)
             #dx = pinv(fMat).dot(constant)
             dx = lstsq(A, constant)[0]
-            x = x + dx
+            x += dx
 
         ## solve non-linear part
         currentPosition = -(fMat.dot(x) - vVec)
@@ -61,6 +58,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         print("Solve the non-linear sub problem")
         #dTotal = pinv(totalJacobian).dot(currentPosition) * stepsize
         dTotal = lstsq(totalJacobian, currentPosition)[0]
+        print("Total gradient vector: " + str(np.linalg.norm(dTotal)))
 
         stepsize = find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint)
         
@@ -78,21 +76,21 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
     print("Find optimal stepsize")
     minCondition = True
     reducingPower = 0
-    xTest = x
-    xTest[:(slicePoint + 1)] += dTotal[:(slicePoint + 1)]
-    zTest = z
-    zTest += dTotal[(slicePoint + 1):]
     while minCondition:
         stepsize = 0.5 ** reducingPower
         a = fMat.dot(x) - vVec
-        xTest = xTest * stepsize
-        zTest = zTest * stepsize
+        if weights["rew"] == 0:
+            xTest = x.copy()
+            xTest[0] += dTotal[0] * stepsize
+        else:
+            xTest = x + dTotal[:(slicePoint + 1)] * stepsize
+        zTest = z + dTotal[(slicePoint + 1):] * stepsize
         fMatTest = generate_fMatrix(weights["rew"], zTest, len(rates), len(waterlevel), nodes, timeseries)
         vVecTest = generate_vVector(weights["rew"], weights["dw"], zTest, waterlevel, rates, nodes)
         b = fMatTest.dot(xTest) - vVecTest
         c = totalJacobian.dot(dTotal)
         result = np.linalg.norm(a)**2 - np.linalg.norm(b)**2 - 0.5 * stepsize * np.linalg.norm(c)**2
-        minCondition = round(result, 6) < 0
+        minCondition = result < 0 #round(result, 10) < 0
         reducingPower += 1
     print("Stepsize found: " + str(stepsize))
     return stepsize
@@ -321,3 +319,7 @@ def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurr
     else:
         entryList = [subSumResult]
     subSums[entryKey] = entryList
+
+
+
+
