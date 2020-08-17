@@ -293,7 +293,7 @@ def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
     if upperLim < lowerLim:
         ## wellbore storage case
         slope = 1
-        intersect = 0
+        intersect = zCurrent - nodeCurrent
         result = np.exp(upperLim * slope) / slope
     else:
         slope = (zCurrent - zBefore) / (nodeCurrent - nodeBefore)
@@ -321,7 +321,3 @@ def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurr
     else:
         entryList = [subSumResult]
     subSums[entryKey] = entryList
-
-
-
-

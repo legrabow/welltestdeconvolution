@@ -1,8 +1,16 @@
 ### run tests on the code
 
+## import build-in
 import numpy as np
 import pandas as pd
-from scipy.optimize import check_grad
+from scipy.optimize import check_grad, approx_fprime
+
+## import other functions
+from functions import *
+from data_preparation import *
+from variableProjection import *
+from weightFunctions import *
+
 
 def check_example():
     ## test 1: Uniform spacing of nodes in the time domain
@@ -30,39 +38,55 @@ def check_example():
 def check_gradients_convMat():
     ## test 2: Check jacobian by evaluating each row of the error function based on how 
     ## good its corresponding gradient approximates the numerical gradient
-    row = 0
+    weights = dict()
     timeseries = np.arange(0, 31)
     z = np.random.normal(loc = -12, size = len(timeseries))
     rates = np.random.normal(loc = 900,scale = 100, size = len(timeseries) - 1)
     waterlevel = np.random.normal(loc = 0.6, size = len(timeseries) - 1)
-    nodes = get_nodes(startNode = 0.4, timeseries = timeseries)
+    nodes = get_nodes(startNode = 0.4, timeseries = timeseries, amountNodes=None, interpolation="linear")
     wlNatIn = max(waterlevel)
     weights["rew"] = get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
     weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
+    total = np.concatenate((rates, z))
+    total = np.insert(total, 0 , wlNatIn)
+    total = list(total)
     rates = rates.reshape((len(rates),1))
-    waterlevel = waterlevel.reshape((len(waterlevel),1))
-    z = z.reshape((len(z), 1))
-    x0 = np.vstack([wlNatIn, rates, z])
-    resid = check_grad(error_measure, grad_measure, x0, rates, weights, waterlevel, nodes, timeseries, row)
-    print(resid)
+    waterlevel = waterlevel.reshape((len(waterlevel), 1))
+    for row in xrange(0, 62):
+        resid = check_grad(error_measure, grad_measure, total, rates, weights, waterlevel, nodes, timeseries, row)
+        eps = np.sqrt(np.finfo(float).eps)
+        jacPython = approx_fprime(total, error_measure, eps, rates, weights, waterlevel, nodes, timeseries, row)
+        jacMe = grad_measure(total, rates, weights, waterlevel, nodes, timeseries, row)
+        print("################ row: " + str(row))
+        print("Residuum: " + str(resid))
+        print("Numeric gradient:")
+        print(jacPython)
+        print("Program's gradient:")
+        print(jacMe)
     
     
     
 def grad_measure(total, rates, weights, waterlevel, nodes, timeseries, row):
     x = total[:(len(rates) + 1)]
+    x = np.array(x)
+    x = x.reshape((len(x), 1))
     z = total[(len(rates) + 1):]
+    z = np.array(z)
+    z = z.reshape((len(z), 1))
     fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
     zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries)
     totalJacobian = np.hstack((fMat, zJacobian))
-    return totalJacobian[row,:]
+    return list(totalJacobian[row,:])
     
 def error_measure(total, rates, weights, waterlevel, nodes, timeseries, row):
     x = total[:(len(rates) + 1)]
+    x = np.array(x)
+    x = x.reshape((len(x), 1))
     z = total[(len(rates) + 1):]
+    z = np.array(z)
+    z = z.reshape((len(z), 1))
     fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
-    fMat = fMat[:len(waterlevel),:]
     vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
-    vVec = vVec[:len(waterlevel),:]
     error = fMat.dot(x) - vVec
-    return error[row]
-## test 3: Check determinant of jacobian
+    return error[row][0]
+

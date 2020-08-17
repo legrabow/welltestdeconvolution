@@ -7,10 +7,10 @@ import pickle
 import matplotlib.pyplot as plt
 
 ## import other functions
-#from functions import *
-#from data_preparation import *
-#from variableProjection import *
-#from weightFunctions import *
+from functions import *
+from data_preparation import *
+from variableProjection import *
+from weightFunctions import *
 
 ## important parameters
 
@@ -102,7 +102,7 @@ entriesConvMat = dict()
 
 ### solve the non-linear LTS-Problem
 
-#y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
+y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
 
 ### save result
 
@@ -128,8 +128,3 @@ with open(fileName, 'wb') as outputFile:
 
 plt.plot(nodes, z)
 
-if False:
-
-    ### optional scripts:
-    check_p1_contribtution(nodes, z, q, pNat, waterlevel)
-    check_rank()
