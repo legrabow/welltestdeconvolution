@@ -5,70 +5,66 @@ from scipy.linalg import svd, pinv, lstsq
 def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
     
-    #global zOut
-    #global xOut
-    #global fMatOut
-    #global subSums
-    #global entriesConvMat
+    errorRatio = 1
+    stepsize = 1
     
-    iterationCounter = 0
-    errorRatio = 2 * sc
-    errorIn = None
+    ## calculate initial matrices
+    print("Generate the fMatrix")
+    fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
+    print("Generate the vVector")
+    vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
     
-    while errorRatio > sc:
-        print("Start with the solving-loop...")
-        subSums = dict()
-        
-        print("Generate the fMatrix")
-        fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
-        print("Generate the vVector")
-        vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
-
-
-        ## calculate error
-        error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
-
-        if errorIn:
-            errorRatio = error / errorIn
-            print("Calculated error ratio: " + str(errorRatio))
-        else:
-            errorIn = error
+    ## calculate initial error
+    errorIn = np.linalg.norm(fMat.dot(x) - vVec) ** 2
+    print("Initial error: " + str(errorIn))
+    
+    while errorRatio > sc and stepsize > 10**-50:
+        print("Start with a solving cycle...")
 
         ## solve linear part
-        constant = vVec - fMat.dot(x)
         print("Solve the linear sub problem")
+        constant = vVec - fMat.dot(x)
         if weights["rew"] == 0:
             A = fMat[:,0]
             A = A.reshape((len(A), 1))
             slicePoint = 0 
             dp = np.vdot(A, constant) / (np.linalg.norm(A) ** 2)
+            # set new vector
             x[0] += dp
         else:
             A = fMat
             slicePoint = len(rates)
-            #dx = pinv(fMat).dot(constant)
             dx = lstsq(A, constant)[0]
+            # set new vector
             x += dx
 
         ## solve non-linear part
+        print("Solve the non-linear sub problem")
         currentPosition = -(fMat.dot(x) - vVec)
         zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries)
 
         totalJacobian = np.hstack((A, zJacobian))
-        print("Solve the non-linear sub problem")
-        #dTotal = pinv(totalJacobian).dot(currentPosition) * stepsize
         dTotal = lstsq(totalJacobian, currentPosition)[0]
         print("Total gradient vector: " + str(np.linalg.norm(dTotal)))
-
-        stepsize = find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint)
         
+        # find stepsize
+        stepsize = find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint)
+
+        # set new vector
         dTotal = dTotal * stepsize
         x[:(slicePoint + 1)] += dTotal[:(slicePoint + 1)]
         z += dTotal[(slicePoint + 1):]
-
-        #entriesConvMat[str(iterationCounter)] = subSums
-        #fMatOut[str(iterationCounter)] = fMat
-        iterationCounter += 1
+        
+        ## calculate new matrices
+        print("Generate the fMatrix")
+        fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
+        print("Generate the vVector")
+        vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
+        
+        ## calculate error
+        error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
+        errorRatio = error / errorIn
+        print("Calculated error ratio: " + str(errorRatio))
 
     return x[1:], z, x[0]
 
@@ -90,7 +86,7 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
         b = fMatTest.dot(xTest) - vVecTest
         c = totalJacobian.dot(dTotal)
         result = np.linalg.norm(a)**2 - np.linalg.norm(b)**2 - 0.5 * stepsize * np.linalg.norm(c)**2
-        minCondition = result < 0 #round(result, 10) < 0
+        minCondition = result < 0
         reducingPower += 1
     print("Stepsize found: " + str(stepsize))
     return stepsize
