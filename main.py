@@ -7,10 +7,10 @@ import pickle
 import matplotlib.pyplot as plt
 
 ## import other functions
-from functions import *
-from data_preparation import *
-from variableProjection import *
-from weightFunctions import *
+#from functions import *
+#from data_preparation import *
+#from variableProjection import *
+#from weightFunctions import *
 
 ## important parameters
 
@@ -28,18 +28,21 @@ amountNodes = None
 # directory where to find the rate- and water level data
 dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
 # the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
-stoppingCriterion = 10**-6
+stoppingCriterion = 10**-8
 # time of the first node in percentage of one day (so 1 > startNode > 0)
 startNode = 0.2
 # optional weights to consider
-weightingFunctions = {
- "tidals":False,
- "holidays":False,
- "beginning":False,
- "pumping":False
+# "consider" defines whether the case should be considered
+# "Envelope" defines if the enveloping function of the tidal signal should be taken
+# "Variance" defines the sharpness of the negative probability density function 
+# "Sharpness" defines the sharpness of the arctan function for the beginning
+# "Shift" defines the shift of the arctan function for a later start
+weighingFunctions = {
+ "tidals":{"Consider":False, "Envelope":True},
+ "holidays":{"Consider":False, "Variance":1},
+ "beginning":{"Consider":False, "Sharpness":0.5,"Shift":0.1},
+ "pumping":{"Consider":False}
 }
-# specifing the sharpness of the arctan function as a weight function for the beginning
-beginningWeightPar = None
 # maximal gaps that are acceptable without giving out a warning about bad deconvolution results
 maxGaps = 10
 # provide your own assumed natural water level. Very important if the time series does not exhibit recovery periods!
@@ -58,7 +61,7 @@ ratesRaw = get_rates(starttime = starttime, endtime = endtime, dataDir = dataDir
 
 ## clean and merge data
 
-timeseries, waterlevelTot, ratesTot, isInterWl, isInterRates = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
+timeseries, waterlevelTot, ratesTot, isInterWl, isInterRates, timeRange = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
 waterlevel = waterlevelTot[1:,]
 rates = ratesTot[1:,]
 
@@ -81,14 +84,7 @@ weights = dict()
 
 ## own weights
 
-if weightingFunctions["tidals"]:
-    weights["tidals"] = get_tidal_weighting(timeseries)
-if weightingFunctions["holidays"]:
-    weights["holidays"] = get_holiday_weighting(timeseries)
-if weightingFunctions["beginning"]:
-    weights["beginning"] = get_beginningWeight(beginningWeightPar)
-if weightingFunctions["pumping"]:
-    weights["pumping"] = get_pumping_weigthing(yIn)
+weights["totalWeightMatrix"] = get_total_weight(weighingFunctions, len(nodes), rates, len(timeseries), timeRange)
 
 ## general weights
 

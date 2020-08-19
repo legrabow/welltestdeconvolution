@@ -42,4 +42,3 @@ def get_initial_responses(nodes, waterlevel, rates, wlNat, timeseries):
     responsesRadial = np.full(shape = ((len(nodes) - 1), 1), fill_value = np.log(rfCoef))
     responsesTotal = np.insert(responsesRadial, 0, np.log(wbsCoef), axis = 0)
     return responsesTotal
-

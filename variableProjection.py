@@ -6,19 +6,22 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
     
     errorRatio = 1
-    stepsize = 1
+    errorRatioChange = 1
+    wMat = weights["totalWeightMatrix"]
     
     ## calculate initial matrices
     print("Generate the fMatrix")
     fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
+    fMat = wMat.dot(fMat)
     print("Generate the vVector")
     vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
+    vVec = wMat.dot(vVec)
     
     ## calculate initial error
     errorIn = np.linalg.norm(fMat.dot(x) - vVec) ** 2
     print("Initial error: " + str(errorIn))
     
-    while errorRatio > sc and stepsize > 10**-50:
+    while errorRatio > sc and errorRatioChange > 10**-10:
         print("Start with a solving cycle...")
 
         ## solve linear part
@@ -44,6 +47,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries)
 
         totalJacobian = np.hstack((A, zJacobian))
+        totalJacobian = wMat.dot(totalJacobian)
         dTotal = lstsq(totalJacobian, currentPosition)[0]
         print("Total gradient vector: " + str(np.linalg.norm(dTotal)))
         
@@ -58,11 +62,14 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         ## calculate new matrices
         print("Generate the fMatrix")
         fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
+        fMat = wMat.dot(fMat)
         print("Generate the vVector")
         vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
+        vVec = wMat.dot(vVec)
         
         ## calculate error
         error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
+        errorRatioChange = abs(errorRatio - error / errorIn) / errorRatio
         errorRatio = error / errorIn
         print("Calculated error ratio: " + str(errorRatio))
 
@@ -315,7 +322,3 @@ def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurr
     else:
         entryList = [subSumResult]
     subSums[entryKey] = entryList
-
-
-
-
