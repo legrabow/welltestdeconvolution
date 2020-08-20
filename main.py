@@ -1,7 +1,7 @@
 ### main script for deconvolution
 
 ## import build-in
-from datetime import datetime, timedelta
+from datetime import datetime
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
@@ -14,9 +14,9 @@ from weightFunctions import *
 
 ## important parameters
 # start time of time series to look at
-starttime = datetime.strptime("01/12/2005","%d/%m/%Y") + timedelta(i)
+starttime = datetime.strptime("01/12/2005","%d/%m/%Y")
 # end time of time series to look at (standard: 31/12/2005)
-endtime = datetime.strptime("01/02/2006","%d/%m/%Y") + timedelta(i)
+endtime = datetime.strptime("01/02/2006","%d/%m/%Y")
 # amount of time nodes of the response function
 # increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
 # if no amount is given by the user the amount will be equal to the amount of rates
