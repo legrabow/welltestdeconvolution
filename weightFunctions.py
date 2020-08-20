@@ -7,16 +7,32 @@ def get_holiday_weight(var, starttime, endtime):
     return
 
 def get_beginning_weight(shs, shift, length):
-    [for d in xrange(length) np.arctan(d)]
+    if shs <= 0:
+        raise Exception("The sharpness must be positive! No inverting allowed..")
+    if shift < 0:
+        raise Exception("The shift must be positive!")
+    
+    weightValues = [np.arctan((d - shift) * shs) / np.pi + 0.5 for d in xrange(length)]
+    weightMat = np.zeros((length, length))
+    row,col = np.diag_indices(weightMat.shape[0])
+    weightMat[row,col] = weightValues
+    return weightMat
+
+def get_pumping_weight(rates):
     return
 
-def get_pumping_weight(yIn):
+def get_derivative_contrains(uncTime, relWeight):
     return
 
-def get_total_weight(weighingFunctions, nodeLength, rates, timeLength, timeRange):
+def get_total_weight(weighingFunctions, nodes, rates, timeLength, timeRange):
+    ## define shapes
+    nrowWl = timeLength - 1
+    nrowRate = len(rates)
+    nrowSmt = len(nodes) - 1
+    
     ## get weights for water level errors
-    nrow = timeLength - 1
-    wlError = np.identity(nrow)
+    wlError = np.identity(nrowWl)
+    fillMat = np.zeros((nrowRate + nrowSmt, nrowWl))
     if weighingFunctions["tidals"]["Consider"]:
         tidMat = get_tidal_weight(weighingFunctions["tidals"]["Envelope"], timeRange[0], timeRange[1])
         wlError = tidMat.dot(wlError)
@@ -24,22 +40,31 @@ def get_total_weight(weighingFunctions, nodeLength, rates, timeLength, timeRange
         holMat = get_holiday_weight(weighingFunctions["holidays"]["Variance"], timeRange[0], timeRange[1])
         wlError = holMat.dot(wlError)
     if weighingFunctions["beginning"]["Consider"]:
-        begMat = get_beginning_weight(weighingFunctions["beginning"]["Sharpness"], weighingFunctions["beginning"]["Shift"], nrow)
+        begMat = get_beginning_weight(weighingFunctions["beginning"]["Sharpness"], weighingFunctions["beginning"]["Shift"], nrowWl)
         wlError = begMat.dot(wlError)
+    wlTotal = np.vstack([wlError, fillMat])
         
     ## get weights for rate errors
-    nrow = len(rates)
-    rateError = np.identity(nrow)
+    rateError = np.identity(nrowRate)
+    fillMat1 = np.zeros((nrowWl, nrowRate))
+    fillMat2 = np.zeros((nrowSmt, nrowRate))
     if weighingFunctions["pumping"]["Consider"]:
         rateMat = get_pumping_weight(rates)
         rateError = rateMat.dot(rateError)
+    rateTotal = np.vstack([fillMat1, rateError, fillMat2])
         
     ## get weights for smoothness measure
-    nrow = len(nodes) - 1
-    smtError = np.identity(nrow)
+    smtError = np.identity(nrowSmt)
+    fillMat = np.zeros((nrowWl + nrowRate, nrowSmt))
+    if weighingFunctions["derivativeContrain"]["Consider"]:
+        uncTime = weighingFunctions["derivativeContrain"]["unconstrainedTime"]
+        relWeight = weighingFunctions["derivativeContrain"]["relWeight"]
+        derMat = get_derivative_constrains(uncTime, relWeight, nodes)
+        smtError = derMat.dot(smtError)
+    smtTotal = np.vstack([fillMat, smtError])
     
     ## combine all
-    wMat = np.vstack([wlError, rateError, smtError])
+    wMat = np.hstack([wlTotal, rateTotal, smtTotal])
     return wMat
 
 def get_rateError_weight(wlNat, waterlevel, rates):
@@ -54,3 +79,4 @@ def get_derivate_weight(wlNat, waterlevel):
     drawdown = wlNat - waterlevel
     dw = np.linalg.norm(drawdown) ** 2 / len(waterlevel)
     return dw
+

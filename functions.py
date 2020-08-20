@@ -24,17 +24,23 @@ def get_initial_wlNat(waterlevel):
     wlNat = max(waterlevel)
     return wlNat
 
-def get_initial_responses(nodes, waterlevel, rates, wlNat, timeseries):
+def get_initial_responses(nodes, waterlevel, rates, wlNat, timeseries, wMat):
     ### calculate and return an inital response function as a start value for the
     ### iterative VP-algorithm
     ### first guess: well bore storage before and radial flow after the first node
     ## calculate the best fit for a radial flow
-    radialFlow = np.full(shape = (len(waterlevel),len(rates)), fill_value = timeseries[1])
-    radialFlow = np.tril(radialFlow)
-    firstIntegral = timeseries[1] - np.exp(nodes[0])
-    np.fill_diagonal(radialFlow, firstIntegral)
+    wlLength = len(waterlevel)
+    wlError = wMat[:wlLength,:wlLength]
+    radialFlow = np.zeros(shape = (wlLength,len(rates)))
+    firstIntegral = np.log(timeseries[1]) - nodes[0]
+    fullIntegrals = [np.log(tEnd) - np.log(tStart) for tStart, tEnd in zip(timeseries[1:], timeseries[2:])]
+    v1 = np.insert(fullIntegrals, 0, firstIntegral)
+    for i in xrange(wlLength):
+        radialFlow[i:, i] = v1[:(wlLength - i)]
     convolution = radialFlow.dot(rates)
+    convolution = wlError.dot(convolution)
     drawdown = wlNat - waterlevel
+    drawdown = wlError.dot(drawdown)
     rfCoef = np.vdot(convolution, drawdown) / np.linalg.norm(convolution) ** 2
     ## calculate well bore storage coefficient
     wbsCoef = rfCoef * np.exp(-nodes[0])

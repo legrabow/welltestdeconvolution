@@ -11,11 +11,9 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
     
     ## calculate initial matrices
     print("Generate the fMatrix")
-    fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
-    fMat = wMat.dot(fMat)
+    fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries, wMat)
     print("Generate the vVector")
-    vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
-    vVec = wMat.dot(vVec)
+    vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes, wMat)
     
     ## calculate initial error
     errorIn = np.linalg.norm(fMat.dot(x) - vVec) ** 2
@@ -44,15 +42,14 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         ## solve non-linear part
         print("Solve the non-linear sub problem")
         currentPosition = -(fMat.dot(x) - vVec)
-        zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries)
+        zJacobian = generate_jacobian(nodes, z, x[1:], weights["dw"], len(rates), timeseries, wMat)
 
         totalJacobian = np.hstack((A, zJacobian))
-        totalJacobian = wMat.dot(totalJacobian)
         dTotal = lstsq(totalJacobian, currentPosition)[0]
         print("Total gradient vector: " + str(np.linalg.norm(dTotal)))
         
         # find stepsize
-        stepsize = find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint)
+        stepsize = find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint, wMat)
 
         # set new vector
         dTotal = dTotal * stepsize
@@ -61,11 +58,9 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         
         ## calculate new matrices
         print("Generate the fMatrix")
-        fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries)
-        fMat = wMat.dot(fMat)
+        fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries, wMat)
         print("Generate the vVector")
-        vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes)
-        vVec = wMat.dot(vVec)
+        vVec = generate_vVector(weights["rew"], weights["dw"], z, waterlevel, rates, nodes, wMat)
         
         ## calculate error
         error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
@@ -75,7 +70,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
 
     return x[1:], z, x[0]
 
-def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint):
+def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint, wMat):
     print("Find optimal stepsize")
     minCondition = True
     reducingPower = 0
@@ -88,8 +83,8 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
         else:
             xTest = x + dTotal[:(slicePoint + 1)] * stepsize
         zTest = z + dTotal[(slicePoint + 1):] * stepsize
-        fMatTest = generate_fMatrix(weights["rew"], zTest, len(rates), len(waterlevel), nodes, timeseries)
-        vVecTest = generate_vVector(weights["rew"], weights["dw"], zTest, waterlevel, rates, nodes)
+        fMatTest = generate_fMatrix(weights["rew"], zTest, len(rates), len(waterlevel), nodes, timeseries, wMat)
+        vVecTest = generate_vVector(weights["rew"], weights["dw"], zTest, waterlevel, rates, nodes, wMat)
         b = fMatTest.dot(xTest) - vVecTest
         c = totalJacobian.dot(dTotal)
         result = np.linalg.norm(a)**2 - np.linalg.norm(b)**2 - 0.5 * stepsize * np.linalg.norm(c)**2
@@ -98,11 +93,12 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
     print("Stepsize found: " + str(stepsize))
     return stepsize
 
-def generate_vVector(rew, dw, z, waterlevel, rates, nodes):
+def generate_vVector(rew, dw, z, waterlevel, rates, nodes, wMat):
     ### calculate the vector that contains the waterlevel, the wheighted rates
     ### and the smoothness measure for the total error function
     smoothness = generate_smoothnessMeasure(dw, nodes, z)
     vVec = np.vstack([waterlevel, rates * np.sqrt(rew), smoothness])
+    vVec = wMat.dot(vVec)
     return vVec
 
 def generate_smoothnessMeasure(dw, nodes, z):
@@ -113,7 +109,7 @@ def generate_smoothnessMeasure(dw, nodes, z):
     smoothness = (sdMat.dot(z) - expected) * np.sqrt(dw)
     return smoothness
 
-def generate_jacobian(nodes, z, y, dw, rateLength, timeseries):
+def generate_jacobian(nodes, z, y, dw, rateLength, timeseries, wMat):
     ### calculate the jacobian matrix of the error measure with respect to the 
     ### response values for Gauss-Newton
     print("Generate the jacobian matrix with respect to the response values:")
@@ -121,6 +117,7 @@ def generate_jacobian(nodes, z, y, dw, rateLength, timeseries):
     sdMat = - generate_secondDerivativeMatrix(nodes) * np.sqrt(dw)
     jacobianRates = np.zeros(shape=(len(y), len(z)))
     zJacobian = np.concatenate((jacobianConvolution, jacobianRates, sdMat))
+    zJacobian = wMat.dot(zJacobian)
     return zJacobian
 
 def generate_jacobianConvolution(nodes, z, y, rateLength, timeseries):
@@ -216,7 +213,7 @@ def generate_secondDerivativeMatrix(nodes):
             sdMat[idx, idx - 1] = 1 / angleSideBefore
     return sdMat
 
-def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
+def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries, wMat):
     ### calculate the matrix that will be multiplied with the presumed rates for the total error function
     ## create skeleton for convolution error measure
     convMat = - generate_convMatrix(z, rateLength, nodes, timeseries)
@@ -229,6 +226,7 @@ def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries):
     smthsError = np.zeros((len(nodes) - 1,rateLength + 1))
     ## put them all together
     fMat = np.vstack([convError, ratesError, smthsError])
+    fMat = wMat.dot(fMat)
     return fMat
     
 
@@ -322,3 +320,4 @@ def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurr
     else:
         entryList = [subSumResult]
     subSums[entryKey] = entryList
+
