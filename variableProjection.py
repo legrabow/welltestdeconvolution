@@ -54,7 +54,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         # set new vector
         dTotal = dTotal * stepsize
         x[:(slicePoint + 1)] += dTotal[:(slicePoint + 1)]
-        z += dTotal[(slicePoint + 1):]
+        z = z + dTotal[(slicePoint + 1):]
         
         ## calculate new matrices
         print("Generate the fMatrix")
@@ -74,9 +74,10 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
     print("Find optimal stepsize")
     minCondition = True
     reducingPower = 0
+    a = fMat.dot(x) - vVec
+    c = totalJacobian.dot(dTotal)
     while minCondition:
         stepsize = 0.5 ** reducingPower
-        a = fMat.dot(x) - vVec
         if weights["rew"] == 0:
             xTest = x.copy()
             xTest[0] += dTotal[0] * stepsize
@@ -86,7 +87,6 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
         fMatTest = generate_fMatrix(weights["rew"], zTest, len(rates), len(waterlevel), nodes, timeseries, wMat)
         vVecTest = generate_vVector(weights["rew"], weights["dw"], zTest, waterlevel, rates, nodes, wMat)
         b = fMatTest.dot(xTest) - vVecTest
-        c = totalJacobian.dot(dTotal)
         result = np.linalg.norm(a)**2 - np.linalg.norm(b)**2 - 0.5 * stepsize * np.linalg.norm(c)**2
         minCondition = result < 0
         reducingPower += 1
@@ -275,7 +275,7 @@ def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, z
     else:
         slope = (zCurrent - zBefore) / (nodeCurrent - nodeBefore)
         intersect = zCurrent - slope * nodeCurrent
-        if round(slope, 6) != 0:
+        if slope != 0: #round(slope, 6) != 0:
             result = ((upperLim - 1 / slope) * np.exp(slope * upperLim) - (lowerLim - 1 / slope) * np.exp(slope * lowerLim)) / slope
         else:
             result = (upperLim ** 2 - lowerLim ** 2) / 2
@@ -297,7 +297,7 @@ def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
     else:
         slope = (zCurrent - zBefore) / (nodeCurrent - nodeBefore)
         intersect = zCurrent - slope * nodeCurrent
-        if round(slope, 6) != 0:
+        if slope != 0: #round(slope, 6) != 0:
             result = (np.exp(upperLim * slope) - np.exp(lowerLim * slope)) / slope
         else:
             result = upperLim - lowerLim
@@ -320,4 +320,3 @@ def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurr
     else:
         entryList = [subSumResult]
     subSums[entryKey] = entryList
-

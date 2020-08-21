@@ -34,9 +34,9 @@ def get_initial_responses(nodes, waterlevel, rates, wlNat, timeseries, wMat):
     radialFlow = np.zeros(shape = (wlLength,len(rates)))
     firstIntegral = np.log(timeseries[1]) - nodes[0]
     fullIntegrals = [np.log(tEnd) - np.log(tStart) for tStart, tEnd in zip(timeseries[1:], timeseries[2:])]
-    v1 = np.insert(fullIntegrals, 0, firstIntegral)
+    v2 = np.insert(fullIntegrals, 0, firstIntegral)
     for i in xrange(wlLength):
-        radialFlow[i:, i] = v1[:(wlLength - i)]
+        radialFlow[i:, i] = v2[:(wlLength - i)]
     convolution = radialFlow.dot(rates)
     convolution = wlError.dot(convolution)
     drawdown = wlNat - waterlevel
