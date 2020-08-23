@@ -19,7 +19,8 @@ def get_beginning_weight(shs, shift, length):
     return weightMat
 
 def get_pumping_weight(rates):
-    return
+    weightMat = np.zeros((len(rates), len(rates)))
+    return weightMat
 
 def get_derivative_contrains(uncTime, relWeight):
     return
@@ -79,4 +80,3 @@ def get_derivate_weight(wlNat, waterlevel):
     drawdown = wlNat - waterlevel
     dw = np.linalg.norm(drawdown) ** 2 / len(waterlevel)
     return dw
-

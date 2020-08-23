@@ -68,7 +68,7 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         errorRatio = error / errorIn
         print("Calculated error ratio: " + str(errorRatio))
 
-    return x[1:], z, x[0]
+    return x[1:], z, x[0], error
 
 def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint, wMat):
     print("Find optimal stepsize")
@@ -320,3 +320,7 @@ def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurr
     else:
         entryList = [subSumResult]
     subSums[entryKey] = entryList
+
+
+
+

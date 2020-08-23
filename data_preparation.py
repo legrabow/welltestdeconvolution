@@ -6,7 +6,7 @@ import numpy as np
 def get_waterlevel(starttime, endtime, dataDir):
     ### read in water level data
     ### return a pandas data frame
-    path = dataDir + "/waterlevel_daily.csv"
+    path = dataDir + "/waterlevel_daily_CORRECTED.csv"
     dataFrame = pd.read_csv(path)
     dataFrame["Time"] = pd.to_datetime(dataFrame["Time"], format="%d.%m.%Y")
     toTake = (dataFrame["Time"] >= starttime) & (dataFrame["Time"] <= endtime)

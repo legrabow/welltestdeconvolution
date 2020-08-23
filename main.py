@@ -2,15 +2,16 @@
 
 ## import build-in
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 
 ## import other functions
-#from functions import *
-#from data_preparation import *
-#from variableProjection import *
-#from weightFunctions import *
+from functions import *
+from data_preparation import *
+from variableProjection import *
+from weightFunctions import *
 
 ## important parameters
 
@@ -18,17 +19,19 @@ zValues = dict()
 nodeValues = dict()
 wlNatValues = dict()
 zInValues = dict()
+timeRangeValues = dict()
+errorRatioValues = dict()
 
 for i in xrange(365):
     print("####################### reached: " + str(i))
     # start time of time series to look at
-    starttime = datetime.strptime("01/01/2011","%d/%m/%Y") + timedelta(i)
+    starttime = datetime.strptime("01/01/2011","%d/%m/%Y") + timedelta(i)#relativedelta(months=+i)
     # end time of time series to look at (standard: 31/12/2005)
-    endtime = datetime.strptime("01/03/2011","%d/%m/%Y") + timedelta(i)
+    endtime = datetime.strptime("10/01/2011","%d/%m/%Y") + timedelta(i)#relativedelta(months=+i)
     # amount of time nodes of the response function
     # increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
     # if no amount is given by the user the amount will be equal to the amount of rates
-    amountNodes = None
+    amountNodes = 20
 
     ## refining parameters
 
@@ -37,7 +40,7 @@ for i in xrange(365):
     # the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
     stoppingCriterion = 10**-8
     # time of the first node in percentage of one day (so 1 > startNode > 0)
-    startNode = 0.2
+    startNode = 10**(-3) / 24
     # optional weights to consider
     # "consider" defines whether the case should be considered
     # "Envelope" defines if the enveloping function of the tidal signal should be taken
@@ -49,14 +52,14 @@ for i in xrange(365):
     weighingFunctions = {
      "tidals":{"Consider":False, "Envelope":True},
      "holidays":{"Consider":False, "Variance":1},
-     "beginning":{"Consider":True, "Sharpness":10,"Shift":5},
+     "beginning":{"Consider":False, "Sharpness":10000,"Shift":1.5},
      "pumping":{"Consider":False},
      "derivativeContrain":{"Consider":False,"unconstrainedTime":30,"relWeight":2000}
     }
     # maximal gaps that are acceptable without giving out a warning about bad deconvolution results
     maxGaps = 10
     # provide your own assumed natural water level. Very important if the time series does not exhibit recovery periods!
-    wlNatIn = None
+    wlNatIn = 2.8
     # known transmissivity in m**2/d (pumping test 1979)
     transmissivity = 320
 
@@ -74,7 +77,7 @@ for i in xrange(365):
 
 
     ### set up nodes
-    nodes = get_nodes(amountNodes = amountNodes, interpolation="linear", startNode = startNode, timeseries = timeseries)
+    nodes = get_nodes(amountNodes = amountNodes, interpolation="linear - time domain", startNode = startNode, timeseries = timeseries)
 
     ### set initial values
     if not wlNatIn:
@@ -90,7 +93,7 @@ for i in xrange(365):
 
     ## general weights
     weights["rew"] = 0#get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
-    weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel) / 10
+    weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
 
     ### get initial response values
     zIn = get_initial_responses(nodes, waterlevel, yIn, wlNatIn, timeseries, weights["totalWeightMatrix"])
@@ -102,13 +105,15 @@ for i in xrange(365):
 
 
     ### solve the non-linear LTS-Problem
-    y, z, wlNat = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
+    y, z, wlNat, finalError = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
 
-    entry = str(i) + ".." + str(timeRange[0]) + ".." + str(timeRange[1])
+    entry = str(i)
     zValues[entry] = z.copy()
     nodeValues[entry] = np.array(nodes)
     wlNatValues[entry] = wlNat.copy()
     zInValues[entry] = zIn.copy()
+    errorRatioValues[entry] = finalError
+    timeRangeValues[entry] = str(timeRange[0]) + ".." + str(timeRange[1])
 ### save result
 
 output = {

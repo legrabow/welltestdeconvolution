@@ -5,14 +5,17 @@ def get_nodes(amountNodes, interpolation, startNode, timeseries):
     ### calculate and return the nodes corresponding to the logarithmic time steps of the response function
     if not amountNodes:
         amountNodes = len(timeseries)
-    n0 = np.log(startNode * timeseries[1])
-    nEnd = np.log(timeseries[-1])
-    nodes = list()
-    if interpolation == "linear":
+    if interpolation == "linear - node domain":
         ## use linear interpolation scheme, between the start - and end node
-        for k in xrange(amountNodes):
-            n = n0 + k * (nEnd - n0) / (amountNodes - 1)
-            nodes.append(n)
+        n0 = np.log(startNode * timeseries[1])
+        nEnd = np.log(timeseries[-1])
+        nodes = np.linspace(n0, nEnd, amountNodes)
+    if interpolation == "linear - time domain":
+        ## use linear interpolation scheme, between the start - and end time
+        t0 = startNode * timeseries[1]
+        tEnd = timeseries[-1]
+        times = np.linspace(t0, tEnd, amountNodes)
+        nodes = np.log(times)
     return nodes
 
 def get_initial_wlNat(waterlevel):
