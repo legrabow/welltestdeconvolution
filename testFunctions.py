@@ -78,6 +78,7 @@ def check_gradients_convMat():
     
     
 def grad_measure(total, rates, weights, waterlevel, nodes, timeseries, row):
+    ## Gets the jacobian gradient of a given row 
     x = total[:(len(rates) + 1)]
     x = np.array(x)
     x = x.reshape((len(x), 1))
@@ -90,6 +91,7 @@ def grad_measure(total, rates, weights, waterlevel, nodes, timeseries, row):
     return list(totalJacobian[row,:])
     
 def error_measure(total, rates, weights, waterlevel, nodes, timeseries, row):
+    ## Gets the error measure of a given row
     x = total[:(len(rates) + 1)]
     x = np.array(x)
     x = x.reshape((len(x), 1))

@@ -22,100 +22,97 @@ zInValues = dict()
 timeRangeValues = dict()
 errorRatioValues = dict()
 
-for i in xrange(365):
-    print("####################### reached: " + str(i))
-    # start time of time series to look at
-    starttime = datetime.strptime("01/01/2011","%d/%m/%Y") + timedelta(i)#relativedelta(months=+i)
-    # end time of time series to look at (standard: 31/12/2005)
-    endtime = datetime.strptime("10/01/2011","%d/%m/%Y") + timedelta(i)#relativedelta(months=+i)
-    # amount of time nodes of the response function
-    # increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
-    # if no amount is given by the user the amount will be equal to the amount of rates
-    amountNodes = 20
 
-    ## refining parameters
+# start time of time series to look at
+starttime = datetime.strptime("01/01/2011","%d/%m/%Y")
+# end time of time series to look at
+endtime = datetime.strptime("10/01/2011","%d/%m/%Y")
+# amount of time nodes of the response function
+# increasing the amount increases its resolution but makes the whole TLS-problem "less overdetermined"
+# if no amount is given by the user the amount will be equal to the amount of rates
+amountNodes = 20
 
-    # directory where to find the rate- and water level data
-    dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
-    # the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
-    stoppingCriterion = 10**-8
-    # time of the first node in percentage of one day (so 1 > startNode > 0)
-    startNode = 10**(-3) / 24
-    # optional weights to consider
-    # "consider" defines whether the case should be considered
-    # "Envelope" defines if the enveloping function of the tidal signal should be taken
-    # "Variance" defines the sharpness of the negative probability density function 
-    # "Sharpness" defines the sharpness of the arctan function for the beginning
-    # "Shift" defines the shift of the arctan function for a later start
-    # "unconstrainedTime" defnes the length in days after which the 2nd derivative is constrained to zero
-    # "relWeight" defines the relative weight between the contrained and unconstrained set
-    weighingFunctions = {
-     "tidals":{"Consider":False, "Envelope":True},
-     "holidays":{"Consider":False, "Variance":1},
-     "beginning":{"Consider":False, "Sharpness":10000,"Shift":1.5},
-     "pumping":{"Consider":False},
-     "derivativeContrain":{"Consider":False,"unconstrainedTime":30,"relWeight":2000}
-    }
-    # maximal gaps that are acceptable without giving out a warning about bad deconvolution results
-    maxGaps = 10
-    # provide your own assumed natural water level. Very important if the time series does not exhibit recovery periods!
-    wlNatIn = 2.8
-    # known transmissivity in m**2/d (pumping test 1979)
-    transmissivity = 320
+## refining parameters
 
-    ### prepare time series
+# directory where to find the rate- and water level data
+dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
+# the critical ratio of decrease in error after one VPA-cycle and the original error telling VPA when to stop
+stoppingCriterion = 10**-8
+# time of the first node in percentage of one day (so 1 > startNode > 0)
+startNode = 10**(-3) / 24
+# optional weights to consider
+# "consider" defines whether the case should be considered
+# "Envelope" defines if the enveloping function of the tidal signal should be taken
+# "Variance" defines the sharpness of the negative probability density function 
+# "Sharpness" defines the sharpness of the arctan function for the beginning
+# "Shift" defines the shift of the arctan function for a later start
+# "unconstrainedTime" defnes the length in days after which the 2nd derivative is constrained to zero
+# "relWeight" defines the relative weight between the contrained and unconstrained set
+weighingFunctions = {
+        "tidals":{"Consider":False, "Envelope":True},
+        "holidays":{"Consider":False, "Variance":1},
+        "beginning":{"Consider":False, "Sharpness":10000,"Shift":1.5},
+        "pumping":{"Consider":False},
+        "derivativeContrain":{"Consider":False,"unconstrainedTime":30,"relWeight":2000}
+        }
+# maximal gaps that are acceptable without giving out a warning for bad deconvolution results
+maxGaps = 10
+# provides the assumed natural water level. If "None" the maximum water level value of that period will be taken
+wlNatIn = 2.8
 
-    ## get barometrically corrected data
-    waterlevelRaw = get_waterlevel(starttime = starttime, endtime = endtime, dataDir = dataDir)
-    ratesRaw = get_rates(starttime = starttime, endtime = endtime, dataDir = dataDir)
+### prepare time series
 
-    ## clean and merge data
-    timeseries, waterlevelTot, ratesTot, isInterWl, isInterRates, timeRange = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
-    # Note: Depending on the actual time a waterlevel measurement is documented during the day one need to shift 
-    waterlevel = waterlevelTot[:-1,]
-    rates = ratesTot[:-1,]
+## get barometrically corrected data
+waterlevelRaw = get_waterlevel(starttime = starttime, endtime = endtime, dataDir = dataDir)
+ratesRaw = get_rates(starttime = starttime, endtime = endtime, dataDir = dataDir)
+
+## clean and merge data
+timeseries, waterlevelTot, ratesTot, isInterWl, isInterRates, timeRange = process_data(waterlevelFrame = waterlevelRaw, ratesFrame = ratesRaw, maxGaps = maxGaps)
+
+waterlevel = waterlevelTot[:-1,]
+rates = ratesTot[:-1,]
 
 
-    ### set up nodes
-    nodes = get_nodes(amountNodes = amountNodes, interpolation="linear - time domain", startNode = startNode, timeseries = timeseries)
+### set up nodes
+nodes = get_nodes(amountNodes = amountNodes, interpolation="linear - time domain", startNode = startNode, timeseries = timeseries)
 
-    ### set initial values
-    if not wlNatIn:
-        wlNatIn = get_initial_wlNat(waterlevel = waterlevelTot)
-    yIn = rates
-    xIn = np.insert(yIn, 0,wlNatIn, axis=0)
+### set initial values
+if not wlNatIn:
+    wlNatIn = get_initial_wlNat(waterlevel = waterlevelTot)
+yIn = rates
+xIn = np.insert(yIn, 0,wlNatIn, axis=0)
 
-    ### get weighting functions
-    weights = dict()
+### get weighting functions
+weights = dict()
 
-    ## own weights
-    weights["totalWeightMatrix"] = get_total_weight(weighingFunctions, nodes, rates, len(timeseries), timeRange)
+## own weights
+weights["totalWeightMatrix"] = get_total_weight(weighingFunctions, nodes, rates, len(timeseries), timeRange)
 
-    ## general weights
-    weights["rew"] = 0#get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
-    weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
+## general weights
+weights["rew"] = 0#get_rateError_weight(wlNat = wlNatIn, waterlevel = waterlevel, rates = rates)
+weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel)
 
-    ### get initial response values
-    zIn = get_initial_responses(nodes, waterlevel, yIn, wlNatIn, timeseries, weights["totalWeightMatrix"])
-
-    
-    ### set up monitoring objects
-    fMatOut = dict()
-    entriesConvMat = dict()
+### get initial response values
+zIn = get_initial_responses(nodes, waterlevel, yIn, wlNatIn, timeseries, weights["totalWeightMatrix"])
 
 
-    ### solve the non-linear LTS-Problem
-    y, z, wlNat, finalError = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
+### set up monitoring objects
+fMatOut = dict()
+entriesConvMat = dict()
 
-    entry = str(i)
-    zValues[entry] = z.copy()
-    nodeValues[entry] = np.array(nodes)
-    wlNatValues[entry] = wlNat.copy()
-    zInValues[entry] = zIn.copy()
-    errorRatioValues[entry] = finalError
-    timeRangeValues[entry] = str(timeRange[0]) + ".." + str(timeRange[1])
+
+### solve the non-linear LTS-Problem
+y, z, wlNat, finalError = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
+
+entry = str(i)
+zValues[entry] = z.copy()
+nodeValues[entry] = np.array(nodes)
+wlNatValues[entry] = wlNat.copy()
+zInValues[entry] = zIn.copy()
+errorRatioValues[entry] = finalError
+timeRangeValues[entry] = str(timeRange[0]) + ".." + str(timeRange[1])
+
 ### save result
-
 output = {
     "starttime":starttime,
     "endtime":endtime,
@@ -130,12 +127,6 @@ output = {
     "OtherNotes":""
 }
 
-if False:
-    fileName = str(starttime) + "..." + str(endtime)
-    with open(fileName, 'wb') as outputFile:
-        pickle.dump(output, outputFile)
-
-### show result
-
-#plt.plot(nodes, z)
-#plt.show()
+fileName = str(starttime) + "..." + str(endtime)
+with open(fileName, 'wb') as outputFile:
+    pickle.dump(output, outputFile)

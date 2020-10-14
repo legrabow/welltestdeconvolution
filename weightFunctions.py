@@ -1,12 +1,15 @@
 import numpy as np
 
 def get_tidal_weight(takeEnv, starttime, endtime):
+    ## to be continued..
     return
 
 def get_holiday_weight(var, starttime, endtime):
+    ## to be continued..
     return
 
 def get_beginning_weight(shs, shift, length):
+    ## get the weights for the beginning by either using the arctan-function or by setting the first n values to 0
     if shs <= 0:
         raise Exception("The sharpness must be positive! No inverting allowed..")
     if shift < 0:
@@ -19,10 +22,12 @@ def get_beginning_weight(shs, shift, length):
     return weightMat
 
 def get_pumping_weight(rates):
+    ## to be continued..
     weightMat = np.zeros((len(rates), len(rates)))
     return weightMat
 
 def get_derivative_contrains(uncTime, relWeight):
+    ## to be continued..
     return
 
 def get_total_weight(weighingFunctions, nodes, rates, timeLength, timeRange):

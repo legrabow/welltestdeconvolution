@@ -71,6 +71,8 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
     return x[1:], z, x[0], error
 
 def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x, weights, totalJacobian, slicePoint, wMat):
+    ### find the optimal stepsize for a given gradient vector to reduce the error
+    ### the power of 0.5 will be continuously increased until the error is smaller than the prior error
     print("Find optimal stepsize")
     minCondition = True
     reducingPower = 0
@@ -305,6 +307,7 @@ def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):
     return result
 
 def monitor_integral(subSum, nodeBefore, nodeCurrent, start, end, zBefore, zCurrent):
+    ### monitor function for trouble-shooting
     global subSums
     entryKey = str(start) + "..." + str(end)
     subSumResult = {
