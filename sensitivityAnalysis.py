@@ -48,22 +48,24 @@ mu, std = norm.fit(rates)
 
 zError = dict()
 wlError = dict()
+crashes = dict()
 
 
-scaleStepSize = 0.05
-realisations = 10  # per counter
+scaleStepSize = 0.01
+realisations = 5  # per counter
 
-for scale in np.arange(scaleStepSize, 1.5, scaleStepSize):
+for scale in np.arange(scaleStepSize, 0.3, scaleStepSize):
     print("#"*50+"\nReached scale: "+str(scale)+"\n"+"#"*50)
     
     diffWlMat = np.empty((realisations**2,lengthDiffWlMat,))
     diffWlMat[:] = np.nan
-    idxMat = 0
     
     diffzValMat = np.empty((realisations**2,amountNodes,))
     diffzValMat[:] = np.nan
     
     noiseScaleWlNat = noiseScaleWL = noiseScaleRates = scale
+    crashNumber = 0
+    idxMat = 0
     
     for counter1 in xrange(1,realisations+1):
         for counter2 in xrange(1,realisations+1):
@@ -90,11 +92,17 @@ for scale in np.arange(scaleStepSize, 1.5, scaleStepSize):
             theorWL = theorWLNat - theorDD
 
             ### add noise to actual sets
-
-            wlNatIn = theorWLNat + float(np.round(np.random.normal(0,theorWLNat * noiseScaleWlNat), 2))
-            waterlevel = theorWL.copy() + np.random.normal(0,0.2 * noiseScaleWL,(len(rates), 1))
+            
+            wlNatInStd = theorWLNat * noiseScaleWlNat
+            wlNatIn = theorWLNat + float(np.round(np.random.normal(0,wlNatInStd), 2))
+            
+            waterlevelStd = noiseScaleWL * np.linalg.norm(theorWL) / np.sqrt(len(theorWL))
+            waterlevel = theorWL.copy() + np.random.normal(0, waterlevelStd, (len(rates), 1))
+            
             nodes = theorNodes.copy()
-            rates = rates + np.random.normal(0,200 * noiseScaleRates,(len(rates), 1))
+            
+            ratesStd = noiseScaleRates * np.linalg.norm(rates) / np.sqrt(len(rates))
+            rates = rates + np.random.normal(0, ratesStd, (len(rates), 1))
 
             #
             ### solving backwards
@@ -111,9 +119,12 @@ for scale in np.arange(scaleStepSize, 1.5, scaleStepSize):
             weights["dw"] = get_derivate_weight(wlNat = wlNatIn, waterlevel = waterlevel) * 10 ** (-7)
 
             zIn = get_initial_responses(nodes, waterlevel, yIn, wlNatIn, timeseries, weights["totalWeightMatrix"])
-
-            y, z, wlNat, finalError = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
-
+            
+            try:
+                y, z, wlNat, finalError = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
+            except ValueError:
+                crashNumber = crashNumber + 1
+                continue
             #
             ### compare results
             #
@@ -130,8 +141,9 @@ for scale in np.arange(scaleStepSize, 1.5, scaleStepSize):
 
             idxMat = idxMat + 1
             
-    totalDiffWL = diffWlMat.mean(axis=0)
-    totalDiffzVal = diffzValMat.mean(axis=0)
+    totalDiffWL = np.nanmean(diffWlMat, axis=0)
+    totalDiffzVal = np.nanmean(diffzValMat, axis=0)
     
     wlError[str(scale)] = totalDiffWL
     zError[str(scale)] = totalDiffzVal
+    crashes[str(scale)] = crashNumber
