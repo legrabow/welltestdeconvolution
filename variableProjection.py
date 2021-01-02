@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 from scipy.linalg import svd, pinv, lstsq
+np.set_printoptions(threshold=np.inf)
 
 def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries):
     ### VP-algorithm, each cycle calculates the new z and x (i.e. pNat and y) values
@@ -8,7 +9,6 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
     errorRatio = 1
     errorRatioChange = 1
     wMat = weights["totalWeightMatrix"]
-    
     ## calculate initial matrices
     print("Generate the fMatrix")
     fMat = generate_fMatrix(weights["rew"], z, len(rates), len(waterlevel), nodes, timeseries, wMat)
@@ -17,9 +17,10 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
     
     ## calculate initial error
     errorIn = np.linalg.norm(fMat.dot(x) - vVec) ** 2
+    errorBefore = errorIn
     print("Initial error: " + str(errorIn))
     
-    while errorRatio > sc and errorRatioChange > 10**-10:
+    while errorRatio > sc:# and errorRatioChange > 10**-10:
         print("Start with a solving cycle...")
 
         ## solve linear part
@@ -38,7 +39,6 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
             dx = lstsq(A, constant)[0]
             # set new vector
             x += dx
-
         ## solve non-linear part
         print("Solve the non-linear sub problem")
         currentPosition = -(fMat.dot(x) - vVec)
@@ -64,8 +64,9 @@ def variable_projection(nodes, waterlevel, x, rates, z, sc, weights, timeseries)
         
         ## calculate error
         error = np.linalg.norm(fMat.dot(x) - vVec) ** 2
-        errorRatioChange = abs(errorRatio - error / errorIn) / errorRatio
-        errorRatio = error / errorIn
+        #errorRatioChange = abs(errorRatio - error / errorIn) / errorRatio
+        errorRatio = (errorBefore - error) / errorIn
+        errorBefore = error
         print("Calculated error ratio: " + str(errorRatio))
 
     return x[1:], z, x[0], error
@@ -78,6 +79,8 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
     reducingPower = 0
     a = fMat.dot(x) - vVec
     c = totalJacobian.dot(dTotal)
+    #global fMatBefore
+    #fMatBefore = fMat.copy()
     while minCondition:
         stepsize = 0.5 ** reducingPower
         if weights["rew"] == 0:
@@ -87,10 +90,13 @@ def find_stepsize(fMat, vVec, dTotal, rates, nodes, waterlevel, timeseries, z, x
             xTest = x + dTotal[:(slicePoint + 1)] * stepsize
         zTest = z + dTotal[(slicePoint + 1):] * stepsize
         fMatTest = generate_fMatrix(weights["rew"], zTest, len(rates), len(waterlevel), nodes, timeseries, wMat)
-        vVecTest = generate_vVector(weights["rew"], weights["dw"], zTest, waterlevel, rates, nodes, wMat)
-        b = fMatTest.dot(xTest) - vVecTest
-        result = np.linalg.norm(a)**2 - np.linalg.norm(b)**2 - 0.5 * stepsize * np.linalg.norm(c)**2
-        minCondition = result < 0
+        if not np.isnan(np.sum(fMatTest)):
+            vVecTest = generate_vVector(weights["rew"], weights["dw"], zTest, waterlevel, rates, nodes, wMat)
+            b = fMatTest.dot(xTest) - vVecTest
+            #global fMatAfter
+            #fMatAfter = fMatTest.copy()
+            result = np.linalg.norm(a)**2 - np.linalg.norm(b)**2 - 0.5 * stepsize * np.linalg.norm(c)**2
+            minCondition = result < 0
         reducingPower += 1
     print("Stepsize found: " + str(stepsize))
     return stepsize
@@ -176,7 +182,6 @@ def generate_jacobianConvolution(nodes, z, y, rateLength, timeseries):
                     subEnd = timeseries[timeIdx + 1]
                     derivativeEntry = evaluate_triangle_integral(nodeCurrent, nodeBefore, subStart, subEnd, zBefore, zCurrent, True)
                     v1[timeIdx] += derivativeEntry
-        
         kthDerivativeMat = np.zeros(shape=(len(v1),rateLength))
         for i in xrange(rateLength):
                 kthDerivativeMat[i:, i] = v1[:(timeLength- i),0]
@@ -219,6 +224,8 @@ def generate_fMatrix(rew, z, rateLength, wlLength, nodes, timeseries, wMat):
     ### calculate the matrix that will be multiplied with the presumed rates for the total error function
     ## create skeleton for convolution error measure
     convMat = - generate_convMatrix(z, rateLength, nodes, timeseries)
+    #print("convMat:")
+    #print(np.diagonal(convMat))
     wlNatUnit = np.ones((wlLength, 1))
     convError = np.hstack([wlNatUnit, convMat])
     ## create skeleton for rate error measure
@@ -281,7 +288,7 @@ def evaluate_integral_derivative(nodeCurrent, nodeBefore, start, end, zBefore, z
             result = ((upperLim - 1 / slope) * np.exp(slope * upperLim) - (lowerLim - 1 / slope) * np.exp(slope * lowerLim)) / slope
         else:
             result = (upperLim ** 2 - lowerLim ** 2) / 2
-    result = result * np.exp(intersect) 
+    result = result * np.exp(intersect)
     return result
 
 def evaluate_integral(nodeCurrent, nodeBefore, start, end, zBefore, zCurrent):

@@ -104,13 +104,14 @@ entriesConvMat = dict()
 ### solve the non-linear LTS-Problem
 y, z, wlNat, finalError = variable_projection(nodes, waterlevel, xIn, rates, zIn, stoppingCriterion, weights, timeseries)
 
-entry = str(i)
-zValues[entry] = z.copy()
-nodeValues[entry] = np.array(nodes)
-wlNatValues[entry] = wlNat.copy()
-zInValues[entry] = zIn.copy()
-errorRatioValues[entry] = finalError
-timeRangeValues[entry] = str(timeRange[0]) + ".." + str(timeRange[1])
+if False:
+	entry = str(i)
+	zValues[entry] = z.copy()
+	nodeValues[entry] = np.array(nodes)
+	wlNatValues[entry] = wlNat.copy()
+	zInValues[entry] = zIn.copy()
+	errorRatioValues[entry] = finalError
+	timeRangeValues[entry] = str(timeRange[0]) + ".." + str(timeRange[1])
 
 ### save result
 output = {
