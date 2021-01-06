@@ -23,7 +23,7 @@ dataDir = "/home/leonard/Documents/Praktikum/hydraulic_data"
 
 stoppingCriterion = 10**-8
 
-startNode = 0.8#10**(-3) / 24
+startNode = 0.08#10**(-2) #0.8
 
 weighingFunctions = {
         "tidals":{"Consider":False, "Envelope":True},
@@ -44,7 +44,9 @@ waterlevel = waterlevelTot[:-1,]
 lengthDiffWlMat = len(waterlevel)
 del waterlevel
 rates = ratesTot[:-1,]
+lengthRates = len(rates)
 mu, std = norm.fit(rates)
+del rates
 
 zError = dict()
 wlError = dict()
@@ -67,6 +69,10 @@ for scale in np.arange(scaleStepSize, 0.3, scaleStepSize):
     crashNumber = 0
     idxMat = 0
     
+    
+    limitedInfluence = True
+    lastRelevantDay = 4
+    
     for counter1 in xrange(1,realisations+1):
         for counter2 in xrange(1,realisations+1):
             #
@@ -74,9 +80,16 @@ for scale in np.arange(scaleStepSize, 0.3, scaleStepSize):
             #
 
             np.random.seed(counter1)
-            rates = np.random.normal(mu, std,(len(rates), 1)) # maybe gumbel distibution better
+            theorRates = np.random.normal(mu, std,(lengthRates, 1)) # maybe gumbel distibution better
             theorWLNat = float(np.round(np.random.uniform(0.5,5,(1,1)), 2))
             theorZ = np.full((amountNodes, 1), -7.758)
+            #a = 1#0.5
+            #lastRelevantDay = 5
+            #constantValueFrom = 8
+            #x = np.arange(-(amountNodes-lastRelevantDay), lastRelevantDay)
+            #x = x[::-1]
+            #theorZ = -7.758 - np.exp(-x*a)
+            #theorZ[constantValueFrom:] = theorZ[constantValueFrom]
 
             #
             ### forward calculation
@@ -87,9 +100,13 @@ for scale in np.arange(scaleStepSize, 0.3, scaleStepSize):
             ## generate water level
 
             theorNodes = get_nodes(amountNodes = amountNodes, interpolation="linear - node domain", startNode = startNode, timeseries = timeseries)
-            convMat = generate_convMatrix(theorZ, len(rates), theorNodes, timeseries)
-            theorDD = convMat.dot(rates)
+            convMat = generate_convMatrix(theorZ, lengthRates, theorNodes, timeseries)
+            if limitedInfluence:
+                convMat = numpy.triu(convMat, -(lastRelevantDay - 1))
+            theorDD = convMat.dot(theorRates)
             theorWL = theorWLNat - theorDD
+            if np.isnan(np.sum(convMat)):
+                raise Exception("Theoretical z-Values are too low!")
 
             ### add noise to actual sets
             
@@ -97,12 +114,12 @@ for scale in np.arange(scaleStepSize, 0.3, scaleStepSize):
             wlNatIn = theorWLNat + float(np.round(np.random.normal(0,wlNatInStd), 2))
             
             waterlevelStd = noiseScaleWL * np.linalg.norm(theorWL) / np.sqrt(len(theorWL))
-            waterlevel = theorWL.copy() + np.random.normal(0, waterlevelStd, (len(rates), 1))
+            waterlevel = theorWL.copy() + np.random.normal(0, waterlevelStd, (lengthRates, 1))
             
             nodes = theorNodes.copy()
             
-            ratesStd = noiseScaleRates * np.linalg.norm(rates) / np.sqrt(len(rates))
-            rates = rates + np.random.normal(0, ratesStd, (len(rates), 1))
+            ratesStd = noiseScaleRates * np.linalg.norm(theorRates) / np.sqrt(lengthRates)
+            rates = theorRates + np.random.normal(0, ratesStd, (lengthRates, 1))
 
             #
             ### solving backwards
